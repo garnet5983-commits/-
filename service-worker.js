@@ -1,4 +1,4 @@
-const CACHE_NAME = 'success-rate-calc-v5';
+const CACHE_NAME = 'success-rate-calc-v6';
 const ASSETS = [
   './',
   './index.html',
