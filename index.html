@@ -84,7 +84,7 @@
 
   .row {
     display: flex;
-    gap: 10px;
+    gap: 26px;
     margin-bottom: 10px;
   }
   .field {
@@ -153,6 +153,60 @@
   .card.roulette .stepper-btn { border: 1px solid var(--roulette); color: var(--roulette); }
   .card.pig .stepper-btn { border: 1px solid var(--pig); color: var(--pig); }
   .stepper-btn:active { opacity: 0.6; }
+
+  .settings-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .settings-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .settings-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .sound-options {
+    display: flex;
+    gap: 6px;
+  }
+  .sound-btn {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    color: var(--text-dim);
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .sound-btn.active {
+    background: var(--combo);
+    border-color: var(--combo);
+    color: var(--bg);
+    font-weight: 700;
+  }
+  .mute-btn {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    color: var(--text);
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .mute-btn.muted {
+    background: #3a2426;
+    border-color: #5a2f32;
+    color: #e08a7a;
+  }
 
   .result {
     margin-top: 14px;
@@ -431,6 +485,19 @@
     <h1>成功率計算機</h1>
   </header>
 
+  <div class="settings-bar">
+    <div class="settings-group">
+      <span class="settings-label">タップ音</span>
+      <div class="sound-options">
+        <button type="button" class="sound-btn active" data-sound="click">ポチッ</button>
+        <button type="button" class="sound-btn" data-sound="pop">ポコッ</button>
+        <button type="button" class="sound-btn" data-sound="chime">ピコン</button>
+        <button type="button" class="sound-btn" data-sound="theme">テーマ</button>
+      </div>
+    </div>
+    <button type="button" class="mute-btn" id="mute-toggle">🔊 ON</button>
+  </div>
+
   <div class="card roulette">
     <h2>🎯 ルーレット成功率</h2>
     <div class="row">
@@ -614,8 +681,8 @@
 
   async function loadHistory() {
     try {
-      const res = await window.storage.get(HIST_KEY, false);
-      historyData = res && res.value ? JSON.parse(res.value) : [];
+      const raw = localStorage.getItem(HIST_KEY);
+      historyData = raw ? JSON.parse(raw) : [];
     } catch (e) {
       historyData = [];
     }
@@ -624,8 +691,7 @@
 
   async function persistHistory() {
     try {
-      const res = await window.storage.set(HIST_KEY, JSON.stringify(historyData), false);
-      if (!res) storageOk = false;
+      localStorage.setItem(HIST_KEY, JSON.stringify(historyData));
     } catch (e) {
       storageOk = false;
     }
@@ -1025,6 +1091,43 @@
   [rSuccess, rTotal].forEach(el => el.addEventListener('input', updateRoulette));
   [pSuccess, pTotal].forEach(el => el.addEventListener('input', updatePig));
 
+  const INPUTS_KEY = 'saved-inputs';
+  const persistedFields = [rSuccess, rTotal, pSuccess, pTotal];
+
+  function saveInputs() {
+    try {
+      const data = {
+        rSuccess: rSuccess.value,
+        rTotal: rTotal.value,
+        pSuccess: pSuccess.value,
+        pTotal: pTotal.value,
+        mode: mode,
+      };
+      localStorage.setItem(INPUTS_KEY, JSON.stringify(data));
+    } catch (e) { /* 保存できなくても動作は継続 */ }
+  }
+
+  function loadInputs() {
+    try {
+      const raw = localStorage.getItem(INPUTS_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.rSuccess !== undefined) rSuccess.value = data.rSuccess;
+      if (data.rTotal !== undefined) rTotal.value = data.rTotal;
+      if (data.pSuccess !== undefined) pSuccess.value = data.pSuccess;
+      if (data.pTotal !== undefined) pTotal.value = data.pTotal;
+      if (data.mode) {
+        mode = data.mode;
+        Object.entries(modeButtons).forEach(([key, btn]) => {
+          btn.classList.toggle('active', key === data.mode);
+        });
+      }
+    } catch (e) { /* 未保存なら何もしない */ }
+  }
+
+  persistedFields.forEach(el => el.addEventListener('input', saveInputs));
+  Object.values(modeButtons).forEach(btn => btn.addEventListener('click', saveInputs));
+
   function adjustValue(targetId, op) {
     const targetInput = document.getElementById(targetId);
     const deltaInput = document.getElementById(targetId + '-delta');
@@ -1038,12 +1141,157 @@
     targetInput.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
+  let audioCtx = null;
+  let soundType = 'click';
+  let muted = false;
+
+  function ensureAudioCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
+
+  function tone(freq, startTime, duration, type, peakGain) {
+    const ctx = audioCtx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(peakGain, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  }
+
+  function playRouletteTick() {
+    // カチカチ: ルーレットの球が跳ねるような音
+    const now = audioCtx.currentTime;
+    tone(1500, now, 0.03, 'square', 0.10);
+    tone(1500, now + 0.05, 0.03, 'square', 0.08);
+    tone(1500, now + 0.10, 0.025, 'square', 0.06);
+  }
+
+  function playPigOink() {
+    // ブヒッ: 豚の鳴き声風のピッチが揺れる音
+    const ctx = audioCtx;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 900;
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.linearRampToValueAtTime(170, now + 0.07);
+    osc.frequency.linearRampToValueAtTime(260, now + 0.14);
+    osc.frequency.linearRampToValueAtTime(120, now + 0.22);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.16, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.25);
+  }
+
+  function playClickSound(cardType) {
+    if (muted) return;
+    try {
+      ensureAudioCtx();
+      const now = audioCtx.currentTime;
+      if (soundType === 'theme') {
+        if (cardType === 'roulette') {
+          playRouletteTick();
+        } else if (cardType === 'pig') {
+          playPigOink();
+        } else {
+          // 合算カードなど、カード種別が無い場合は標準クリック音
+          tone(880, now, 0.08, 'sine', 0.15);
+        }
+      } else if (soundType === 'pop') {
+        // ポコッ: 低めの短いポップ音
+        tone(220, now, 0.07, 'square', 0.12);
+      } else if (soundType === 'chime') {
+        // ピコン: 高めの2音チャイム
+        tone(1046, now, 0.06, 'sine', 0.13);
+        tone(1568, now + 0.05, 0.09, 'sine', 0.11);
+      } else {
+        // ポチッ: 標準のクリック音
+        tone(880, now, 0.08, 'sine', 0.15);
+      }
+    } catch (e) { /* 音が鳴らせない環境では無視 */ }
+  }
+
+  const muteBtn = document.getElementById('mute-toggle');
+  const soundBtns = document.querySelectorAll('.sound-btn');
+
+  function applySettingsUI() {
+    soundBtns.forEach(b => b.classList.toggle('active', b.dataset.sound === soundType));
+    muteBtn.textContent = muted ? '🔇 OFF' : '🔊 ON';
+    muteBtn.classList.toggle('muted', muted);
+  }
+
+  async function saveSettings() {
+    try {
+      localStorage.setItem('sound-settings', JSON.stringify({ soundType, muted }));
+    } catch (e) { /* 保存できなくても動作は継続 */ }
+  }
+
+  async function loadSettings() {
+    try {
+      const raw = localStorage.getItem('sound-settings');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.soundType) soundType = s.soundType;
+        if (typeof s.muted === 'boolean') muted = s.muted;
+      }
+    } catch (e) { /* 未保存なら初期値のまま */ }
+    applySettingsUI();
+  }
+
+  soundBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      soundType = btn.dataset.sound;
+      applySettingsUI();
+      saveSettings();
+      if (soundType === 'theme') {
+        // テーマ選択時のプレビュー: ルーレット音→少し間を置いて豚の鳴き声
+        playClickSound('roulette');
+        setTimeout(() => playClickSound('pig'), 350);
+      } else {
+        playClickSound();
+      }
+    });
+  });
+
+  muteBtn.addEventListener('click', () => {
+    muted = !muted;
+    applySettingsUI();
+    saveSettings();
+    if (!muted) playClickSound();
+  });
+
+  loadSettings();
+
   document.querySelectorAll('.stepper-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      const target = btn.dataset.target || '';
+      const cardType = target.startsWith('r-') ? 'roulette' : target.startsWith('p-') ? 'pig' : null;
+      playClickSound(cardType);
       adjustValue(btn.dataset.target, btn.dataset.op);
     });
   });
 
+  loadInputs();
+  updateRoulette();
+  updatePig();
   updateCombo();
   loadHistory();
 
