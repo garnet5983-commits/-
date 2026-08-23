@@ -1146,14 +1146,29 @@
   let muted = false;
 
   function ensureAudioCtx() {
-    if (!audioCtx) {
+    if (!audioCtx || audioCtx.state === 'closed') {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
+      audioCtx.resume().catch(() => {});
     }
     return audioCtx;
   }
+
+  // タスク切り替え(バックグラウンド化)でAudioContextが復活しなくなることがあるため、
+  // 非表示になった時点で一旦破棄し、次にボタンが押された時に新しく作り直す
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && audioCtx) {
+      try { audioCtx.close(); } catch (e) { /* 無視 */ }
+      audioCtx = null;
+    }
+  });
+  window.addEventListener('pagehide', () => {
+    if (audioCtx) {
+      try { audioCtx.close(); } catch (e) { /* 無視 */ }
+      audioCtx = null;
+    }
+  });
 
   function tone(freq, startTime, duration, type, peakGain) {
     const ctx = audioCtx;
