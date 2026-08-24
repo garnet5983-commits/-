@@ -79,13 +79,30 @@
   let nonCriticalStorageWarningShown = false;
   const feedbackTimers = new WeakMap();
 
-  function announce(message) {
+  function announce(message, anchorElement = null) {
     window.clearTimeout(statusTimer);
     statusMessage.textContent = message;
+    const anchored = anchorElement instanceof HTMLElement;
+    statusMessage.classList.toggle('anchored', anchored);
+
+    if (anchored) {
+      const rect = anchorElement.getBoundingClientRect();
+      statusMessage.style.left = '0px';
+      statusMessage.style.top = '0px';
+      const halfWidth = Math.min(statusMessage.offsetWidth, window.innerWidth - 32) / 2;
+      const center = rect.left + rect.width / 2;
+      const safeCenter = Math.min(window.innerWidth - halfWidth - 16, Math.max(halfWidth + 16, center));
+      statusMessage.style.left = `${safeCenter}px`;
+      statusMessage.style.top = `${rect.top - 40}px`;
+    } else {
+      statusMessage.style.removeProperty('left');
+      statusMessage.style.removeProperty('top');
+    }
+
     statusMessage.classList.add('show');
     statusTimer = window.setTimeout(() => {
       statusMessage.classList.remove('show');
-    }, 2600);
+    }, 3000);
   }
 
   function readStoredJSON(primaryKey, legacyKey = null) {
@@ -592,13 +609,13 @@
     stepperBatchTimer = null;
     if (!stepperBatch) return;
 
-    const { targetId, operation, presses, amount } = stepperBatch;
+    const { targetId, operation, presses, amount, anchorElement } = stepperBatch;
     const sign = operation === 'plus' ? '＋' : '－';
-    announce(`${STEPPER_LABELS[targetId] || '数値'}：${sign}を${presses}回（合計${sign}${amount}）`);
+    announce(`${STEPPER_LABELS[targetId] || '数値'}：${sign}を${presses}回（合計${sign}${amount}）`, anchorElement);
     stepperBatch = null;
   }
 
-  function recordStepperAction(targetId, operation, amount) {
+  function recordStepperAction(targetId, operation, amount, anchorElement) {
     if (amount <= 0) return;
 
     if (stepperBatch && (stepperBatch.targetId !== targetId || stepperBatch.operation !== operation)) {
@@ -606,8 +623,9 @@
     }
 
     if (!stepperBatch) {
-      stepperBatch = { targetId, operation, presses: 0, amount: 0 };
+      stepperBatch = { targetId, operation, presses: 0, amount: 0, anchorElement };
     }
+    stepperBatch.anchorElement = anchorElement;
     stepperBatch.presses += 1;
     stepperBatch.amount += amount;
     window.clearTimeout(stepperBatchTimer);
@@ -967,7 +985,7 @@
       const result = adjustValue(target, operation);
       if (!result) return;
       playClickSound(cardType);
-      if (result.changed) recordStepperAction(target, operation, result.amount);
+      if (result.changed) recordStepperAction(target, operation, result.amount, button);
     });
   });
 

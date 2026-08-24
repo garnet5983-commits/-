@@ -674,6 +674,12 @@
     opacity: 1;
     transform: translate(-50%, 0);
   }
+  .status-message.anchored {
+    transform: translate(-50%, calc(-100% - 8px));
+  }
+  .status-message.anchored.show {
+    transform: translate(-50%, -100%);
+  }
 
   @media (max-width: 360px) {
     .row { gap: 12px; }
