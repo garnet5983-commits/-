@@ -50,6 +50,10 @@
   const historyPanel = byId('history-panel');
   const historyList = byId('history-list');
   const historyClear = byId('history-clear');
+  const resetToggle = byId('reset-toggle');
+  const resetConfirm = byId('reset-confirm');
+  const resetCancel = byId('reset-cancel');
+  const resetExecute = byId('reset-execute');
   const statusMessage = byId('status-message');
 
   const modeButtons = {
@@ -69,6 +73,7 @@
   let comboDetail = '';
   let historyData = [];
   let statusTimer = null;
+  let resetConfirmTimer = null;
   let nonCriticalStorageWarningShown = false;
   const feedbackTimers = new WeakMap();
 
@@ -603,6 +608,25 @@
     return true;
   }
 
+  function resetConfirmationIsOpen() {
+    return !resetConfirm.hidden;
+  }
+
+  function setResetConfirmation(open, returnFocus = false) {
+    window.clearTimeout(resetConfirmTimer);
+    resetConfirm.hidden = !open;
+    resetToggle.setAttribute('aria-expanded', String(open));
+
+    if (open) {
+      resetConfirmTimer = window.setTimeout(() => {
+        setResetConfirmation(false);
+      }, 8000);
+      window.requestAnimationFrame(() => resetCancel.focus());
+    } else if (returnFocus) {
+      resetToggle.focus();
+    }
+  }
+
   historyToggle.addEventListener('click', () => setHistoryOpen(!historyIsOpen()));
   historyClear.addEventListener('click', () => {
     if (!window.confirm('記憶した結果をすべて削除しますか？')) return;
@@ -610,6 +634,36 @@
     historyData = [];
     renderHistory();
     announce('履歴をすべて削除しました。');
+  });
+
+  resetToggle.addEventListener('click', () => {
+    setResetConfirmation(!resetConfirmationIsOpen());
+  });
+
+  resetCancel.addEventListener('click', () => {
+    setResetConfirmation(false, true);
+    announce('リセットをキャンセルしました。');
+  });
+
+  resetExecute.addEventListener('click', () => {
+    const inputs = [rSuccess, rTotal, pSuccess, pTotal];
+    const hasInput = inputs.some((input) => input.value !== '');
+    setResetConfirmation(false, true);
+    if (!hasInput) {
+      announce('リセットする数値はありません。');
+      return;
+    }
+
+    inputs.forEach((input) => { input.value = ''; });
+    updateRoulette();
+    updatePig();
+    saveInputs();
+    announce('4つの入力数値をリセットしました。履歴は残っています。');
+  });
+
+  resetConfirm.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    setResetConfirmation(false, true);
   });
 
   rSaveBtn.addEventListener('click', () => {
@@ -648,12 +702,14 @@
 
   [rSuccess, rTotal].forEach((input) => {
     input.addEventListener('input', () => {
+      if (resetConfirmationIsOpen()) setResetConfirmation(false);
       updateRoulette();
       saveInputs();
     });
   });
   [pSuccess, pTotal].forEach((input) => {
     input.addEventListener('input', () => {
+      if (resetConfirmationIsOpen()) setResetConfirmation(false);
       updatePig();
       saveInputs();
     });
