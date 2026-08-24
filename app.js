@@ -74,6 +74,8 @@
   let historyData = [];
   let statusTimer = null;
   let resetConfirmTimer = null;
+  let stepperBatchTimer = null;
+  let stepperBatch = null;
   let nonCriticalStorageWarningShown = false;
   const feedbackTimers = new WeakMap();
 
@@ -578,6 +580,40 @@
     }
   }
 
+  const STEPPER_LABELS = {
+    'r-total': 'ルーレット試行回数',
+    'r-success': 'ルーレット成功回数',
+    'p-total': '豚の試行回数',
+    'p-success': '豚の成功回数',
+  };
+
+  function flushStepperBatch() {
+    window.clearTimeout(stepperBatchTimer);
+    stepperBatchTimer = null;
+    if (!stepperBatch) return;
+
+    const { targetId, operation, presses, amount } = stepperBatch;
+    const sign = operation === 'plus' ? '＋' : '－';
+    announce(`${STEPPER_LABELS[targetId] || '数値'}：${sign}を${presses}回（合計${sign}${amount}）`);
+    stepperBatch = null;
+  }
+
+  function recordStepperAction(targetId, operation, amount) {
+    if (amount <= 0) return;
+
+    if (stepperBatch && (stepperBatch.targetId !== targetId || stepperBatch.operation !== operation)) {
+      flushStepperBatch();
+    }
+
+    if (!stepperBatch) {
+      stepperBatch = { targetId, operation, presses: 0, amount: 0 };
+    }
+    stepperBatch.presses += 1;
+    stepperBatch.amount += amount;
+    window.clearTimeout(stepperBatchTimer);
+    stepperBatchTimer = window.setTimeout(flushStepperBatch, 700);
+  }
+
   function adjustValue(targetId, operation) {
     const targetInput = byId(targetId);
     const deltaInput = byId(`${targetId}-delta`);
@@ -605,7 +641,7 @@
     }
     targetInput.value = String(next);
     targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-    return true;
+    return { changed: next !== current, amount: Math.abs(next - current) };
   }
 
   function resetConfirmationIsOpen() {
@@ -927,7 +963,11 @@
     button.addEventListener('click', () => {
       const target = button.dataset.target || '';
       const cardType = target.startsWith('r-') ? 'roulette' : target.startsWith('p-') ? 'pig' : null;
-      if (adjustValue(target, button.dataset.op)) playClickSound(cardType);
+      const operation = button.dataset.op;
+      const result = adjustValue(target, operation);
+      if (!result) return;
+      playClickSound(cardType);
+      if (result.changed) recordStepperAction(target, operation, result.amount);
     });
   });
 
