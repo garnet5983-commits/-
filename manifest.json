@@ -1,22 +1,24 @@
 {
+  "id": "./",
   "name": "成功率計算機",
-  "short_name": "成功率計算機",
-  "description": "ルーレット・豚・合算値の成功率を計算してSNSにコピペできるツール",
-  "start_url": "./index.html",
+  "short_name": "成功率",
+  "description": "ルーレットと豚の成功率、合算確率を計算して記録できるツールです。",
+  "lang": "ja",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#14171c",
   "theme_color": "#14171c",
-  "orientation": "portrait",
+  "categories": ["utilities", "productivity"],
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
