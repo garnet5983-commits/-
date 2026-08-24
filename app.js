@@ -662,6 +662,7 @@
   let audioCtx = null;
   let soundType = 'click';
   let muted = false;
+  let volume = 0.7;
 
   async function ensureAudioCtx() {
     if (!audioCtx || audioCtx.state === 'closed') {
@@ -690,7 +691,7 @@
     const gain = context.createGain();
     oscillator.type = type;
     oscillator.frequency.value = frequency;
-    gain.gain.setValueAtTime(peakGain, startTime);
+    gain.gain.setValueAtTime(peakGain * volume, startTime);
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
     oscillator.connect(gain);
     gain.connect(context.destination);
@@ -713,7 +714,7 @@
     filter.type = 'bandpass';
     filter.frequency.value = 2800;
     filter.Q.value = 0.7;
-    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.setValueAtTime(0.4 * volume, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
     noise.connect(filter);
     filter.connect(gain);
@@ -744,8 +745,8 @@
     tremoloDepth.gain.value = 0.5;
     tremoloGain.gain.value = 0.5;
     envelope.gain.setValueAtTime(0.0001, now);
-    envelope.gain.linearRampToValueAtTime(0.28, now + 0.025);
-    envelope.gain.setValueAtTime(0.24, now + 0.15);
+    envelope.gain.linearRampToValueAtTime(0.28 * volume, now + 0.025);
+    envelope.gain.setValueAtTime(0.24 * volume, now + 0.15);
     envelope.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     oscillator.connect(filter);
@@ -761,7 +762,7 @@
   }
 
   async function playClickSound(cardType = null) {
-    if (muted) return;
+    if (muted || volume <= 0) return;
     try {
       const context = await ensureAudioCtx();
       const now = context.currentTime;
@@ -783,6 +784,10 @@
   }
 
   const muteBtn = byId('mute-toggle');
+  const volumeControl = byId('volume-control');
+  const volumeSummary = byId('volume-summary');
+  const volumeSlider = byId('volume-slider');
+  const volumeOutput = byId('volume-output');
   const soundButtons = document.querySelectorAll('.sound-btn');
 
   function applySettingsUI() {
@@ -795,10 +800,15 @@
     muteBtn.classList.toggle('muted', muted);
     muteBtn.setAttribute('aria-pressed', String(muted));
     muteBtn.setAttribute('aria-label', muted ? '効果音をオンにする' : '効果音をオフにする');
+    const volumePercent = Math.round(volume * 100);
+    volumeSlider.value = String(volumePercent);
+    volumeOutput.textContent = `${volumePercent}%`;
+    volumeSummary.textContent = `${volumePercent === 0 ? '🔇' : '🎚'} ${volumePercent}%`;
+    volumeSummary.setAttribute('aria-label', `音量を調節する。現在${volumePercent}パーセント`);
   }
 
   function saveSettings() {
-    writeStoredJSON(SETTINGS_KEY, { soundType, muted });
+    writeStoredJSON(SETTINGS_KEY, { soundType, muted, volume });
   }
 
   function loadSettings() {
@@ -806,6 +816,9 @@
     if (stored && stored.value && typeof stored.value === 'object') {
       if (VALID_SOUNDS.has(stored.value.soundType)) soundType = stored.value.soundType;
       if (typeof stored.value.muted === 'boolean') muted = stored.value.muted;
+      if (Number.isFinite(stored.value.volume)) {
+        volume = Math.min(1, Math.max(0, stored.value.volume));
+      }
       if (stored.legacy) saveSettings();
     }
     applySettingsUI();
@@ -834,6 +847,24 @@
     applySettingsUI();
     saveSettings();
     if (!muted) playClickSound();
+  });
+
+  volumeSlider.addEventListener('input', () => {
+    const nextVolume = Number(volumeSlider.value) / 100;
+    volume = Number.isFinite(nextVolume) ? Math.min(1, Math.max(0, nextVolume)) : 0.7;
+    applySettingsUI();
+    saveSettings();
+  });
+
+  volumeSlider.addEventListener('change', () => {
+    if (!muted && volume > 0) playClickSound();
+    volumeControl.open = false;
+  });
+
+  volumeControl.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    volumeControl.open = false;
+    volumeSummary.focus();
   });
 
   document.querySelectorAll('.stepper-btn').forEach((button) => {

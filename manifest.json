@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "成功率計算機",
-  "short_name": "成功率",
-  "description": "ルーレットと豚の成功率、合算確率を計算して記録できるツールです。",
+  "name": "九条組専用計算機",
+  "short_name": "九条組計算機",
+  "description": "九条組専用のルーレット・豚成功率計算ツールです。",
   "lang": "ja",
   "start_url": "./",
   "scope": "./",
@@ -11,6 +11,12 @@
   "theme_color": "#14171c",
   "categories": ["utilities", "productivity"],
   "icons": [
+    {
+      "src": "./icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "./icon-192.png",
       "sizes": "192x192",
