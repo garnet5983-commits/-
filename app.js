@@ -11,7 +11,9 @@
   const VALID_SOUNDS = new Set(['click', 'pop', 'chime', 'tick', 'coin', 'drop', 'beep', 'sparkle']);
   const APP_CACHE_PREFIX = 'success-rate-calc-';
   const STEPPER_WINDOW_MS = 30000;
-  const STEPPER_TOAST_MS = 120000;
+  const DEFAULT_TOAST_SECONDS = 60;
+  const MIN_TOAST_SECONDS = 1;
+  const MAX_TOAST_SECONDS = 600;
   const SOUND_GAIN = 0.7;
 
   const STORAGE_PREFIX = 'success-rate-calc:v8';
@@ -63,6 +65,7 @@
   const resetExecute = byId('reset-execute');
   const statusMessage = byId('status-message');
   const stepperToastStack = byId('stepper-toast-stack');
+  const toastDurationInput = byId('toast-duration');
 
   let rData = null;
   let pData = null;
@@ -531,20 +534,44 @@
     'p-success': '豚の成功回数',
   };
 
+  function hideStepperToast(summary) {
+    window.clearTimeout(summary.hideTimer);
+    summary.toast?.remove();
+    summary.toast = null;
+    summary.message = null;
+    summary.hideTimer = null;
+  }
+
+  function scheduleStepperToastHide(summary) {
+    window.clearTimeout(summary.hideTimer);
+    const elapsed = Math.max(0, Date.now() - summary.lastUpdatedAt);
+    const remaining = toastDurationSeconds * 1000 - elapsed;
+    if (remaining <= 0) {
+      hideStepperToast(summary);
+      return;
+    }
+    summary.hideTimer = window.setTimeout(() => hideStepperToast(summary), remaining);
+  }
+
   function recordStepperAction(targetId, operation, amount) {
     if (amount <= 0) return;
     const now = Date.now();
     const key = `${targetId}:${operation}`;
     let summary = stepperSummaries.get(key);
     if (!summary || now - summary.lastPressedAt >= STEPPER_WINDOW_MS) {
-      if (summary) window.clearTimeout(summary.hideTimer);
+      if (summary) {
+        hideStepperToast(summary);
+      }
       summary = {
         lastPressedAt: now,
+        lastUpdatedAt: now,
         presses: 0,
         amount: 0,
         toast: summary?.toast || null,
+        message: null,
         hideTimer: null,
       };
+      summary.toast = null;
       stepperSummaries.set(key, summary);
     }
 
@@ -554,18 +581,27 @@
     if (!summary.toast || !summary.toast.isConnected) {
       summary.toast = document.createElement('div');
       summary.toast.className = 'stepper-toast';
+      summary.message = document.createElement('span');
+      summary.message.className = 'stepper-toast-message';
+      const dismissButton = document.createElement('button');
+      dismissButton.type = 'button';
+      dismissButton.className = 'stepper-toast-dismiss';
+      dismissButton.textContent = '消去';
+      dismissButton.setAttribute('aria-label', `${STEPPER_LABELS[targetId] || '数値'}の操作メッセージを消す`);
+      dismissButton.addEventListener('click', () => {
+        const activeSummary = stepperSummaries.get(key);
+        if (activeSummary?.toast !== summary.toast) return;
+        hideStepperToast(activeSummary);
+      });
+      summary.toast.append(summary.message, dismissButton);
       stepperToastStack.appendChild(summary.toast);
     }
 
     const action = operation === 'plus' ? 'プラス' : 'マイナス';
     const sign = operation === 'plus' ? '＋' : '－';
-    summary.toast.textContent = `${STEPPER_LABELS[targetId] || '数値'}：${action}${summary.presses}回（合計${sign}${summary.amount}）`;
-    window.clearTimeout(summary.hideTimer);
-    summary.hideTimer = window.setTimeout(() => {
-      summary.toast?.remove();
-      summary.toast = null;
-      summary.hideTimer = null;
-    }, STEPPER_TOAST_MS);
+    summary.message.textContent = `${STEPPER_LABELS[targetId] || '数値'}：${action}${summary.presses}回（合計${sign}${summary.amount}）`;
+    summary.lastUpdatedAt = now;
+    scheduleStepperToastHide(summary);
   }
 
   function adjustValue(targetId, operation) {
@@ -715,6 +751,7 @@
   let audioCtx = null;
   let soundType = 'click';
   let muted = false;
+  let toastDurationSeconds = DEFAULT_TOAST_SECONDS;
 
   async function ensureAudioCtx() {
     if (!audioCtx || audioCtx.state === 'closed') {
@@ -796,10 +833,12 @@
     muteBtn.classList.toggle('muted', muted);
     muteBtn.setAttribute('aria-pressed', String(muted));
     muteBtn.setAttribute('aria-label', muted ? '効果音をオンにする' : '効果音をオフにする');
+    toastDurationInput.value = String(toastDurationSeconds);
+    toastDurationInput.setAttribute('aria-invalid', 'false');
   }
 
   function saveSettings() {
-    writeStoredJSON(SETTINGS_KEY, { soundType, muted });
+    writeStoredJSON(SETTINGS_KEY, { soundType, muted, toastDurationSeconds });
   }
 
   function loadSettings() {
@@ -807,6 +846,11 @@
     if (stored && stored.value && typeof stored.value === 'object') {
       if (VALID_SOUNDS.has(stored.value.soundType)) soundType = stored.value.soundType;
       if (typeof stored.value.muted === 'boolean') muted = stored.value.muted;
+      if (Number.isSafeInteger(stored.value.toastDurationSeconds)
+        && stored.value.toastDurationSeconds >= MIN_TOAST_SECONDS
+        && stored.value.toastDurationSeconds <= MAX_TOAST_SECONDS) {
+        toastDurationSeconds = stored.value.toastDurationSeconds;
+      }
       if (stored.legacy) saveSettings();
     }
     applySettingsUI();
@@ -828,6 +872,23 @@
     applySettingsUI();
     saveSettings();
     if (!muted) playClickSound();
+  });
+
+  toastDurationInput.addEventListener('change', () => {
+    const nextValue = Number(toastDurationInput.value);
+    if (!Number.isSafeInteger(nextValue) || nextValue < MIN_TOAST_SECONDS || nextValue > MAX_TOAST_SECONDS) {
+      toastDurationInput.setAttribute('aria-invalid', 'true');
+      announce('通知表示時間は1〜600秒の整数で入力してください。');
+      toastDurationInput.value = String(toastDurationSeconds);
+      return;
+    }
+    toastDurationSeconds = nextValue;
+    toastDurationInput.setAttribute('aria-invalid', 'false');
+    saveSettings();
+    stepperSummaries.forEach((summary) => {
+      if (summary.toast?.isConnected) scheduleStepperToastHide(summary);
+    });
+    announce(`操作メッセージの表示時間を${toastDurationSeconds}秒に変更しました。`);
   });
 
   document.querySelectorAll('.stepper-btn').forEach((button) => {

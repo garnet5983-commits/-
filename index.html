@@ -338,6 +338,34 @@
     border-color: #5a2f32;
     color: #e08a7a;
   }
+  .toast-duration-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 44px;
+    padding: 5px 10px;
+    border: 1px solid var(--panel-edge);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  .toast-duration-control input {
+    width: 72px;
+    min-height: 34px;
+    padding: 4px 7px;
+    border: 1px solid var(--panel-edge);
+    border-radius: 7px;
+    background: #0f1216;
+    color: var(--text);
+    font: inherit;
+    font-size: 16px;
+    text-align: center;
+    -moz-appearance: textfield;
+  }
+  .toast-duration-control input::-webkit-outer-spin-button,
+  .toast-duration-control input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .toast-duration-control input[aria-invalid="true"] { border-color: #ff8c8c; }
 
   .result {
     margin-top: 14px;
@@ -698,6 +726,10 @@
     pointer-events: none;
   }
   .stepper-toast {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     border: 1px solid var(--combo);
     border-radius: 10px;
     background: rgba(15, 18, 22, 0.97);
@@ -706,9 +738,26 @@
     padding: 10px 14px;
     font-size: 13px;
     line-height: 1.4;
-    text-align: center;
+    text-align: left;
+    pointer-events: auto;
     animation: stepper-toast-in 0.18s ease-out;
   }
+  .stepper-toast-message { flex: 1; }
+  .stepper-toast-dismiss {
+    flex-shrink: 0;
+    min-width: 52px;
+    min-height: 40px;
+    padding: 6px 10px;
+    border: 1px solid #5a626e;
+    border-radius: 8px;
+    background: #242a32;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .stepper-toast-dismiss:active { opacity: 0.65; }
   @keyframes stepper-toast-in {
     from { opacity: 0; transform: translateY(-10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -749,6 +798,11 @@
         </div>
       </div>
       <button type="button" class="mute-btn" id="mute-toggle" aria-pressed="false" aria-label="効果音をオフにする">🔊 ON</button>
+      <label class="toast-duration-control" for="toast-duration">
+        通知表示
+        <input type="number" id="toast-duration" inputmode="numeric" min="1" max="600" step="1" value="60" aria-label="操作メッセージの表示秒数">
+        秒
+      </label>
     </div>
 
     <section class="card roulette" aria-labelledby="roulette-heading">
@@ -876,7 +930,7 @@
       <div class="reset-confirm" id="reset-confirm" role="group" aria-labelledby="reset-confirm-title" hidden>
         <p id="reset-confirm-title">
           4つの入力数値とアプリキャッシュを消去しますか？
-          <span class="reset-note">履歴・増減幅・効果音設定は削除されません。8秒で自動的に閉じます。</span>
+          <span class="reset-note">履歴・増減幅・効果音・通知表示時間は削除されません。8秒で自動的に閉じます。</span>
         </p>
         <div class="reset-actions">
           <button type="button" class="reset-cancel" id="reset-cancel">キャンセル</button>
