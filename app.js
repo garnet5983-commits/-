@@ -1,11 +1,18 @@
 'use strict';
 
 (() => {
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach((eventName) => {
+    document.addEventListener(eventName, (event) => event.preventDefault(), { passive: false });
+  });
+
   const byId = (id) => document.getElementById(id);
   const MAX_COUNT = Number.MAX_SAFE_INTEGER;
   const DIGITS_ONLY = /^\d+$/;
-  const VALID_MODES = new Set(['pool', 'either', 'both', 'avg']);
-  const VALID_SOUNDS = new Set(['click', 'pop', 'chime', 'theme']);
+  const VALID_SOUNDS = new Set(['click', 'pop', 'chime', 'tick', 'coin', 'drop', 'beep', 'sparkle']);
+  const APP_CACHE_PREFIX = 'success-rate-calc-';
+  const STEPPER_WINDOW_MS = 30000;
+  const STEPPER_TOAST_MS = 7000;
+  const SOUND_GAIN = 0.7;
 
   const STORAGE_PREFIX = 'success-rate-calc:v8';
   const HIST_KEY = `${STORAGE_PREFIX}:history`;
@@ -55,15 +62,8 @@
   const resetCancel = byId('reset-cancel');
   const resetExecute = byId('reset-execute');
   const statusMessage = byId('status-message');
+  const stepperToastStack = byId('stepper-toast-stack');
 
-  const modeButtons = {
-    pool: byId('mode-pool'),
-    either: byId('mode-either'),
-    both: byId('mode-both'),
-    avg: byId('mode-avg'),
-  };
-
-  let mode = 'pool';
   let rData = null;
   let pData = null;
   let rRate = null;
@@ -74,31 +74,13 @@
   let historyData = [];
   let statusTimer = null;
   let resetConfirmTimer = null;
-  let stepperBatchTimer = null;
-  let stepperBatch = null;
+  const stepperSummaries = new Map();
   let nonCriticalStorageWarningShown = false;
   const feedbackTimers = new WeakMap();
 
-  function announce(message, anchorElement = null) {
+  function announce(message) {
     window.clearTimeout(statusTimer);
     statusMessage.textContent = message;
-    const anchored = anchorElement instanceof HTMLElement;
-    statusMessage.classList.toggle('anchored', anchored);
-
-    if (anchored) {
-      const rect = anchorElement.getBoundingClientRect();
-      statusMessage.style.left = '0px';
-      statusMessage.style.top = '0px';
-      const halfWidth = Math.min(statusMessage.offsetWidth, window.innerWidth - 32) / 2;
-      const center = rect.left + rect.width / 2;
-      const safeCenter = Math.min(window.innerWidth - halfWidth - 16, Math.max(halfWidth + 16, center));
-      statusMessage.style.left = `${safeCenter}px`;
-      statusMessage.style.top = `${rect.top - 40}px`;
-    } else {
-      statusMessage.style.removeProperty('left');
-      statusMessage.style.removeProperty('top');
-    }
-
     statusMessage.classList.add('show');
     statusTimer = window.setTimeout(() => {
       statusMessage.classList.remove('show');
@@ -234,10 +216,7 @@
 
   function buildComboText() {
     if (comboValue === null) return null;
-    if (mode === 'pool' && comboCounts) {
-      return `${comboCounts.total}回中${comboCounts.success}回⭕️${fmt(comboValue)}`;
-    }
-    return fmt(comboValue);
+    return comboCounts ? `${comboCounts.total}回中${comboCounts.success}回⭕️${fmt(comboValue)}` : null;
   }
 
   function setCopyOutput(input, button, text) {
@@ -308,81 +287,31 @@
     comboBreakdown.style.display = 'none';
     comboCounts = null;
 
-    if (mode === 'pool') {
-      comboLabel.textContent = '合計成功回数 ÷ 合計試行回数';
-      if (!rData || !pData) {
-        clearCombo('ルーレットと豚の有効な回数を両方入力すると自動計算されます。');
-        return;
-      }
-
-      const totalSuccess = rData.success + pData.success;
-      const totalTrials = rData.total + pData.total;
-      if (!Number.isSafeInteger(totalSuccess) || !Number.isSafeInteger(totalTrials)) {
-        clearCombo('合計値が大きすぎるため、安全に計算できません。');
-        return;
-      }
-
-      comboValue = totalSuccess / totalTrials;
-      comboCounts = { success: totalSuccess, total: totalTrials };
-      comboDetail = `合計成功${totalSuccess}（ルーレット${rData.success}+豚${pData.success}） / 合計試行${totalTrials}（ルーレット${rData.total}+豚${pData.total}）`;
-      comboResult.textContent = fmt(comboValue);
-      comboNote.textContent = '2種類の成功回数と試行回数をそのまま合計して算出します。';
-      comboBreakdown.style.display = 'flex';
-      comboSuccessEl.textContent = `${totalSuccess}（${rData.success} + ${pData.success}）`;
-      comboTotalEl.textContent = `${totalTrials}（${rData.total} + ${pData.total}）`;
-    } else {
-      const modeInfo = {
-        either: {
-          label: '少なくとも一方が成功する確率',
-          note: '独立事象と仮定: 1 − (1−ルーレット)×(1−豚)',
-        },
-        both: {
-          label: '両方とも成功する確率',
-          note: '独立事象と仮定: ルーレット × 豚',
-        },
-        avg: {
-          label: '単純平均成功率',
-          note: '(ルーレット + 豚) ÷ 2（試行回数による重み付けなし）',
-        },
-      }[mode];
-
-      comboLabel.textContent = modeInfo.label;
-      if (rRate === null || pRate === null) {
-        clearCombo(`ルーレットと豚の有効な成功率を両方入力してください。${modeInfo.note}`);
-        return;
-      }
-
-      if (mode === 'either') {
-        comboValue = 1 - (1 - rRate) * (1 - pRate);
-      } else if (mode === 'both') {
-        comboValue = rRate * pRate;
-      } else {
-        comboValue = (rRate + pRate) / 2;
-      }
-      comboDetail = `ルーレット${fmt(rRate)} / 豚${fmt(pRate)}`;
-      comboResult.textContent = fmt(comboValue);
-      comboNote.textContent = modeInfo.note;
+    comboLabel.textContent = '合計成功回数 ÷ 合計試行回数';
+    if (!rData || !pData) {
+      clearCombo('ルーレットと豚の有効な回数を両方入力すると自動計算されます。');
+      return;
     }
+
+    const totalSuccess = rData.success + pData.success;
+    const totalTrials = rData.total + pData.total;
+    if (!Number.isSafeInteger(totalSuccess) || !Number.isSafeInteger(totalTrials)) {
+      clearCombo('合計値が大きすぎるため、安全に計算できません。');
+      return;
+    }
+
+    comboValue = totalSuccess / totalTrials;
+    comboCounts = { success: totalSuccess, total: totalTrials };
+    comboDetail = `合計成功${totalSuccess}（ルーレット${rData.success}+豚${pData.success}） / 合計試行${totalTrials}（ルーレット${rData.total}+豚${pData.total}）`;
+    comboResult.textContent = fmt(comboValue);
+    comboNote.textContent = '2種類の成功回数と試行回数をそのまま合計して算出します。';
+    comboBreakdown.style.display = 'flex';
+    comboSuccessEl.textContent = `${totalSuccess}（${rData.success} + ${pData.success}）`;
+    comboTotalEl.textContent = `${totalTrials}（${rData.total} + ${pData.total}）`;
 
     setButtonAvailable(cSaveBtn, true);
     setCopyOutput(cCopyText, cCopyBtn, buildComboText());
     updateAllCopyText();
-  }
-
-  function applyModeUI() {
-    Object.entries(modeButtons).forEach(([key, button]) => {
-      const selected = key === mode;
-      button.classList.toggle('active', selected);
-      button.setAttribute('aria-pressed', String(selected));
-    });
-  }
-
-  function setMode(newMode, persist = true) {
-    if (!VALID_MODES.has(newMode)) return;
-    mode = newMode;
-    applyModeUI();
-    updateCombo();
-    if (persist) saveInputs();
   }
 
   function normalizeStoredCount(value) {
@@ -397,7 +326,6 @@
       rTotal: rTotal.value,
       pSuccess: pSuccess.value,
       pTotal: pTotal.value,
-      mode,
     });
   }
 
@@ -409,7 +337,6 @@
     rTotal.value = normalizeStoredCount(data.rTotal);
     pSuccess.value = normalizeStoredCount(data.pSuccess);
     pTotal.value = normalizeStoredCount(data.pTotal);
-    mode = VALID_MODES.has(data.mode) ? data.mode : 'pool';
     if (stored.legacy) saveInputs();
   }
 
@@ -604,32 +531,41 @@
     'p-success': '豚の成功回数',
   };
 
-  function flushStepperBatch() {
-    window.clearTimeout(stepperBatchTimer);
-    stepperBatchTimer = null;
-    if (!stepperBatch) return;
-
-    const { targetId, operation, presses, amount, anchorElement } = stepperBatch;
-    const sign = operation === 'plus' ? '＋' : '－';
-    announce(`${STEPPER_LABELS[targetId] || '数値'}：${sign}を${presses}回（合計${sign}${amount}）`, anchorElement);
-    stepperBatch = null;
-  }
-
-  function recordStepperAction(targetId, operation, amount, anchorElement) {
+  function recordStepperAction(targetId, operation, amount) {
     if (amount <= 0) return;
-
-    if (stepperBatch && (stepperBatch.targetId !== targetId || stepperBatch.operation !== operation)) {
-      flushStepperBatch();
+    const now = Date.now();
+    const key = `${targetId}:${operation}`;
+    let summary = stepperSummaries.get(key);
+    if (!summary || now - summary.lastPressedAt >= STEPPER_WINDOW_MS) {
+      if (summary) window.clearTimeout(summary.hideTimer);
+      summary = {
+        lastPressedAt: now,
+        presses: 0,
+        amount: 0,
+        toast: summary?.toast || null,
+        hideTimer: null,
+      };
+      stepperSummaries.set(key, summary);
     }
 
-    if (!stepperBatch) {
-      stepperBatch = { targetId, operation, presses: 0, amount: 0, anchorElement };
+    summary.presses += 1;
+    summary.amount += amount;
+    summary.lastPressedAt = now;
+    if (!summary.toast || !summary.toast.isConnected) {
+      summary.toast = document.createElement('div');
+      summary.toast.className = 'stepper-toast';
+      stepperToastStack.appendChild(summary.toast);
     }
-    stepperBatch.anchorElement = anchorElement;
-    stepperBatch.presses += 1;
-    stepperBatch.amount += amount;
-    window.clearTimeout(stepperBatchTimer);
-    stepperBatchTimer = window.setTimeout(flushStepperBatch, 700);
+
+    const action = operation === 'plus' ? 'プラス' : 'マイナス';
+    const sign = operation === 'plus' ? '＋' : '－';
+    summary.toast.textContent = `${STEPPER_LABELS[targetId] || '数値'}：${action}${summary.presses}回（合計${sign}${summary.amount}）`;
+    window.clearTimeout(summary.hideTimer);
+    summary.hideTimer = window.setTimeout(() => {
+      summary.toast?.remove();
+      summary.toast = null;
+      summary.hideTimer = null;
+    }, STEPPER_TOAST_MS);
   }
 
   function adjustValue(targetId, operation) {
@@ -699,20 +635,31 @@
     announce('リセットをキャンセルしました。');
   });
 
-  resetExecute.addEventListener('click', () => {
-    const inputs = [rSuccess, rTotal, pSuccess, pTotal];
-    const hasInput = inputs.some((input) => input.value !== '');
-    setResetConfirmation(false, true);
-    if (!hasInput) {
-      announce('リセットする数値はありません。');
-      return;
+  async function clearAppCaches() {
+    if (!('caches' in window)) return { supported: false, deleted: 0 };
+    try {
+      const keys = await caches.keys();
+      const targets = keys.filter((key) => key.startsWith(APP_CACHE_PREFIX));
+      const results = await Promise.all(targets.map((key) => caches.delete(key)));
+      return { supported: true, deleted: results.filter(Boolean).length };
+    } catch (error) {
+      return { supported: false, deleted: 0 };
     }
+  }
 
+  resetExecute.addEventListener('click', async () => {
+    const inputs = [rSuccess, rTotal, pSuccess, pTotal];
+    setResetConfirmation(false, true);
     inputs.forEach((input) => { input.value = ''; });
     updateRoulette();
     updatePig();
     saveInputs();
-    announce('4つの入力数値をリセットしました。履歴は残っています。');
+    const cacheResult = await clearAppCaches();
+    if (cacheResult.supported) {
+      announce('入力数値とアプリキャッシュを消去しました。履歴は残っています。');
+    } else {
+      announce('入力数値を消去しました。キャッシュはこの環境では消去できませんでした。');
+    }
   });
 
   resetConfirm.addEventListener('keydown', (event) => {
@@ -750,10 +697,6 @@
   twoCopyBtn.addEventListener('click', () => handleCopy(twoCopyText, twoCopyBtn));
   allCopyBtn.addEventListener('click', () => handleCopy(allCopyText, allCopyBtn));
 
-  Object.entries(modeButtons).forEach(([key, button]) => {
-    button.addEventListener('click', () => setMode(key));
-  });
-
   [rSuccess, rTotal].forEach((input) => {
     input.addEventListener('input', () => {
       if (resetConfirmationIsOpen()) setResetConfirmation(false);
@@ -772,7 +715,6 @@
   let audioCtx = null;
   let soundType = 'click';
   let muted = false;
-  let volume = 0.7;
 
   async function ensureAudioCtx() {
     if (!audioCtx || audioCtx.state === 'closed') {
@@ -801,7 +743,7 @@
     const gain = context.createGain();
     oscillator.type = type;
     oscillator.frequency.value = frequency;
-    gain.gain.setValueAtTime(peakGain * volume, startTime);
+    gain.gain.setValueAtTime(peakGain * SOUND_GAIN, startTime);
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
     oscillator.connect(gain);
     gain.connect(context.destination);
@@ -809,82 +751,30 @@
     oscillator.stop(startTime + duration);
   }
 
-  function playDartHit(context) {
-    const now = context.currentTime;
-    const bufferSize = Math.floor(context.sampleRate * 0.05);
-    const buffer = context.createBuffer(1, bufferSize, context.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let index = 0; index < bufferSize; index += 1) {
-      data[index] = (Math.random() * 2 - 1) * Math.pow(1 - index / bufferSize, 2);
-    }
-    const noise = context.createBufferSource();
-    const filter = context.createBiquadFilter();
-    const gain = context.createGain();
-    noise.buffer = buffer;
-    filter.type = 'bandpass';
-    filter.frequency.value = 2800;
-    filter.Q.value = 0.7;
-    gain.gain.setValueAtTime(0.4 * volume, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(context.destination);
-    noise.start(now);
-    tone(context, 140, now, 0.06, 'sine', 0.16);
-  }
-
-  function playPigOink(context) {
-    const now = context.currentTime;
-    const duration = 0.32;
-    const oscillator = context.createOscillator();
-    const filter = context.createBiquadFilter();
-    const tremolo = context.createOscillator();
-    const tremoloDepth = context.createGain();
-    const tremoloGain = context.createGain();
-    const envelope = context.createGain();
-
-    oscillator.type = 'sawtooth';
-    oscillator.frequency.setValueAtTime(240, now);
-    oscillator.frequency.linearRampToValueAtTime(110, now + 0.09);
-    oscillator.frequency.linearRampToValueAtTime(190, now + 0.17);
-    oscillator.frequency.linearRampToValueAtTime(85, now + duration);
-    filter.type = 'bandpass';
-    filter.frequency.value = 550;
-    filter.Q.value = 1.1;
-    tremolo.frequency.value = 38;
-    tremoloDepth.gain.value = 0.5;
-    tremoloGain.gain.value = 0.5;
-    envelope.gain.setValueAtTime(0.0001, now);
-    envelope.gain.linearRampToValueAtTime(0.28 * volume, now + 0.025);
-    envelope.gain.setValueAtTime(0.24 * volume, now + 0.15);
-    envelope.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    oscillator.connect(filter);
-    filter.connect(tremoloGain);
-    tremoloGain.connect(envelope);
-    envelope.connect(context.destination);
-    tremolo.connect(tremoloDepth);
-    tremoloDepth.connect(tremoloGain.gain);
-    oscillator.start(now);
-    oscillator.stop(now + duration);
-    tremolo.start(now);
-    tremolo.stop(now + duration);
-  }
-
-  async function playClickSound(cardType = null) {
-    if (muted || volume <= 0) return;
+  async function playClickSound() {
+    if (muted) return;
     try {
       const context = await ensureAudioCtx();
       const now = context.currentTime;
-      if (soundType === 'theme') {
-        if (cardType === 'roulette') playDartHit(context);
-        else if (cardType === 'pig') playPigOink(context);
-        else tone(context, 880, now, 0.08, 'sine', 0.15);
-      } else if (soundType === 'pop') {
+      if (soundType === 'pop') {
         tone(context, 220, now, 0.07, 'square', 0.12);
       } else if (soundType === 'chime') {
         tone(context, 1046, now, 0.06, 'sine', 0.13);
         tone(context, 1568, now + 0.05, 0.09, 'sine', 0.11);
+      } else if (soundType === 'tick') {
+        tone(context, 1800, now, 0.035, 'square', 0.1);
+      } else if (soundType === 'coin') {
+        tone(context, 988, now, 0.07, 'square', 0.1);
+        tone(context, 1319, now + 0.06, 0.11, 'sine', 0.12);
+      } else if (soundType === 'drop') {
+        tone(context, 740, now, 0.08, 'sine', 0.12);
+        tone(context, 440, now + 0.06, 0.12, 'sine', 0.1);
+      } else if (soundType === 'beep') {
+        tone(context, 660, now, 0.12, 'triangle', 0.14);
+      } else if (soundType === 'sparkle') {
+        tone(context, 1319, now, 0.06, 'sine', 0.09);
+        tone(context, 1760, now + 0.04, 0.08, 'sine', 0.1);
+        tone(context, 2093, now + 0.08, 0.12, 'sine', 0.1);
       } else {
         tone(context, 880, now, 0.08, 'sine', 0.15);
       }
@@ -894,10 +784,6 @@
   }
 
   const muteBtn = byId('mute-toggle');
-  const volumeControl = byId('volume-control');
-  const volumeSummary = byId('volume-summary');
-  const volumeSlider = byId('volume-slider');
-  const volumeOutput = byId('volume-output');
   const soundButtons = document.querySelectorAll('.sound-btn');
 
   function applySettingsUI() {
@@ -910,15 +796,10 @@
     muteBtn.classList.toggle('muted', muted);
     muteBtn.setAttribute('aria-pressed', String(muted));
     muteBtn.setAttribute('aria-label', muted ? '効果音をオンにする' : '効果音をオフにする');
-    const volumePercent = Math.round(volume * 100);
-    volumeSlider.value = String(volumePercent);
-    volumeOutput.textContent = `${volumePercent}%`;
-    volumeSummary.textContent = `${volumePercent === 0 ? '🔇' : '🎚'} ${volumePercent}%`;
-    volumeSummary.setAttribute('aria-label', `音量を調節する。現在${volumePercent}パーセント`);
   }
 
   function saveSettings() {
-    writeStoredJSON(SETTINGS_KEY, { soundType, muted, volume });
+    writeStoredJSON(SETTINGS_KEY, { soundType, muted });
   }
 
   function loadSettings() {
@@ -926,9 +807,6 @@
     if (stored && stored.value && typeof stored.value === 'object') {
       if (VALID_SOUNDS.has(stored.value.soundType)) soundType = stored.value.soundType;
       if (typeof stored.value.muted === 'boolean') muted = stored.value.muted;
-      if (Number.isFinite(stored.value.volume)) {
-        volume = Math.min(1, Math.max(0, stored.value.volume));
-      }
       if (stored.legacy) saveSettings();
     }
     applySettingsUI();
@@ -941,14 +819,7 @@
       soundType = selectedSound;
       applySettingsUI();
       saveSettings();
-      if (soundType === 'theme') {
-        playClickSound('roulette');
-        window.setTimeout(() => {
-          if (soundType === 'theme' && !muted) playClickSound('pig');
-        }, 350);
-      } else {
-        playClickSound();
-      }
+      playClickSound();
     });
   });
 
@@ -959,33 +830,14 @@
     if (!muted) playClickSound();
   });
 
-  volumeSlider.addEventListener('input', () => {
-    const nextVolume = Number(volumeSlider.value) / 100;
-    volume = Number.isFinite(nextVolume) ? Math.min(1, Math.max(0, nextVolume)) : 0.7;
-    applySettingsUI();
-    saveSettings();
-  });
-
-  volumeSlider.addEventListener('change', () => {
-    if (!muted && volume > 0) playClickSound();
-    volumeControl.open = false;
-  });
-
-  volumeControl.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
-    volumeControl.open = false;
-    volumeSummary.focus();
-  });
-
   document.querySelectorAll('.stepper-btn').forEach((button) => {
     button.addEventListener('click', () => {
       const target = button.dataset.target || '';
-      const cardType = target.startsWith('r-') ? 'roulette' : target.startsWith('p-') ? 'pig' : null;
       const operation = button.dataset.op;
       const result = adjustValue(target, operation);
       if (!result) return;
-      playClickSound(cardType);
-      if (result.changed) recordStepperAction(target, operation, result.amount, button);
+      playClickSound();
+      if (result.changed) recordStepperAction(target, operation, result.amount);
     });
   });
 
@@ -997,7 +849,6 @@
   });
 
   loadInputs();
-  applyModeUI();
   loadSettings();
   updateRoulette();
   updatePig();

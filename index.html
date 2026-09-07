@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>九条組専用計算機</title>
 <meta name="theme-color" content="#14171c">
 <meta name="mobile-web-app-capable" content="yes">
@@ -24,6 +24,10 @@
     --text-dim: #8b93a1;
   }
   * { box-sizing: border-box; }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   html, body {
     touch-action: manipulation;
   }
@@ -76,6 +80,98 @@
     font-weight: 700;
     margin: 0;
     letter-spacing: 0.02em;
+  }
+
+  .install-launch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    max-width: 100%;
+    margin-top: 12px;
+    padding: 9px 14px;
+    border: 1px solid var(--panel-edge);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  .install-launch[hidden] { display: none; }
+  .install-launch svg { flex: 0 0 20px; color: var(--combo); }
+  .install-launch:disabled { opacity: 0.6; cursor: wait; }
+  .install-dialog:not([open]) { display: none; }
+  .install-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    width: calc(100% - 32px);
+    max-width: 440px;
+    max-height: calc(100vh - 48px);
+    max-height: calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    margin: auto;
+    padding: 20px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--panel-edge);
+    border-radius: 16px;
+    background: var(--panel);
+    color: var(--text);
+    font-size: 1rem;
+    line-height: 1.65;
+    box-shadow: 0 18px 60px #0008;
+  }
+  .install-dialog::backdrop { background: #0009; }
+  .install-dialog-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .install-dialog h2 { margin: 0; font-size: 1.125rem; }
+  .install-dialog button {
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--panel-edge);
+    border-radius: 8px;
+    background: #0f1216;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  .install-dialog button:disabled { opacity: 0.6; }
+  .install-close { min-width: 44px; flex-shrink: 0; }
+  .install-platforms { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 12px; }
+  .install-platforms button[aria-pressed="true"] {
+    border-color: var(--combo);
+    background: var(--combo);
+    color: var(--bg);
+    font-weight: 700;
+  }
+  .install-dialog ol { padding-left: 1.5em; margin: 12px 0; }
+  .install-dialog li + li { margin-top: 10px; }
+  .install-note { color: #bac1cc; font-size: 0.875rem; margin: 12px 0; }
+  .install-dialog [hidden] { display: none; }
+  .install-url-area { border-top: 1px solid var(--panel-edge); margin-top: 18px; padding-top: 14px; }
+  .install-url-area label { display: block; font-size: 0.875rem; margin-bottom: 6px; }
+  .install-url-area input {
+    width: 100%;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--panel-edge);
+    border-radius: 8px;
+    background: #0f1216;
+    color: var(--text);
+    font: inherit;
+    font-size: 1rem;
+  }
+  .install-url-area button { margin-top: 8px; }
+  .install-feedback { font-size: 0.875rem; margin: 8px 0 0; }
+  .install-feedback:empty { display: none; }
+  @media (display-mode: standalone) {
+    .install-launch { display: none; }
   }
 
   .card {
@@ -154,7 +250,7 @@
     border: 1px solid var(--panel-edge);
     border-radius: 6px;
     color: var(--text-dim);
-    font-size: 14px;
+    font-size: 16px;
     padding: 8px 4px;
     min-height: 44px;
     text-align: center;
@@ -194,6 +290,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    width: 100%;
+    flex-wrap: wrap;
   }
   .settings-label {
     font-size: 11px;
@@ -201,15 +299,18 @@
     flex-shrink: 0;
   }
   .sound-options {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
+    flex: 1;
+    min-width: 260px;
   }
   .sound-btn {
     background: var(--panel);
     border: 1px solid var(--panel-edge);
     color: var(--text-dim);
     font-size: 11px;
-    padding: 8px 12px;
+    padding: 8px 6px;
     min-height: 44px;
     border-radius: 999px;
     cursor: pointer;
@@ -237,73 +338,6 @@
     border-color: #5a2f32;
     color: #e08a7a;
   }
-  .settings-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-  }
-  .volume-control {
-    position: relative;
-    flex-shrink: 0;
-  }
-  .volume-control summary {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    min-width: 74px;
-    padding: 8px 12px;
-    border: 1px solid var(--panel-edge);
-    border-radius: 999px;
-    background: var(--panel);
-    color: var(--text);
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    list-style: none;
-    user-select: none;
-  }
-  .volume-control summary::-webkit-details-marker { display: none; }
-  .volume-control[open] summary {
-    border-color: var(--combo);
-    color: var(--combo);
-  }
-  .volume-popover {
-    position: absolute;
-    z-index: 8;
-    top: calc(100% + 8px);
-    right: 0;
-    width: 220px;
-    padding: 12px;
-    border: 1px solid var(--panel-edge);
-    border-radius: 12px;
-    background: #0f1216;
-    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
-  }
-  .volume-popover label {
-    display: block;
-    margin-bottom: 8px;
-    color: var(--text-dim);
-    font-size: 11px;
-  }
-  .volume-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .volume-row input[type="range"] {
-    width: 150px;
-    accent-color: var(--combo);
-    cursor: pointer;
-  }
-  .volume-row output {
-    min-width: 38px;
-    color: var(--text);
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
 
   .result {
     margin-top: 14px;
@@ -322,31 +356,6 @@
   .card.roulette .result .value { color: var(--roulette); }
   .card.pig .result .value { color: var(--pig); }
   .card.combo .result .value { color: var(--combo); }
-
-  .combo-mode {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 12px;
-  }
-  .combo-mode button {
-    flex: 1 1 auto;
-    min-width: calc(50% - 3px);
-    background: #0f1216;
-    border: 1px solid var(--panel-edge);
-    color: var(--text-dim);
-    font-size: 12px;
-    padding: 10px 6px;
-    min-height: 44px;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-  .combo-mode button.active {
-    color: var(--bg);
-    background: var(--combo);
-    border-color: var(--combo);
-    font-weight: 700;
-  }
 
   .combo-note {
     font-size: 11px;
@@ -674,17 +683,41 @@
     opacity: 1;
     transform: translate(-50%, 0);
   }
-  .status-message.anchored {
-    transform: translate(-50%, calc(-100% - 8px));
+  .stepper-toast-stack {
+    position: fixed;
+    left: 50%;
+    top: calc(76px + env(safe-area-inset-top));
+    z-index: 24;
+    display: flex;
+    width: min(440px, calc(100vw - 32px));
+    max-height: calc(100dvh - 100px);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    transform: translateX(-50%);
+    pointer-events: none;
   }
-  .status-message.anchored.show {
-    transform: translate(-50%, -100%);
+  .stepper-toast {
+    border: 1px solid var(--combo);
+    border-radius: 10px;
+    background: rgba(15, 18, 22, 0.97);
+    color: var(--text);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    padding: 10px 14px;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: center;
+    animation: stepper-toast-in 0.18s ease-out;
+  }
+  @keyframes stepper-toast-in {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   @media (max-width: 360px) {
     .row { gap: 12px; }
     .card { padding-left: 14px; padding-right: 14px; }
-    .sound-options { flex-wrap: wrap; }
+    .sound-options { min-width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 </style>
 </head>
@@ -694,6 +727,10 @@
   <header>
     <div class="eyebrow">Kujo-gumi Probability Tool</div>
     <h1>九条組専用計算機</h1>
+    <button type="button" class="install-launch" id="install-launch" aria-haspopup="dialog" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M9 11h6m-3-3v6m-1 5h2"/></svg>
+      <span id="install-launch-label">ホーム画面に追加</span>
+    </button>
   </header>
 
   <main id="main-content" tabindex="-1">
@@ -704,22 +741,14 @@
           <button type="button" class="sound-btn active" data-sound="click" aria-pressed="true">ポチッ</button>
           <button type="button" class="sound-btn" data-sound="pop" aria-pressed="false">ポコッ</button>
           <button type="button" class="sound-btn" data-sound="chime" aria-pressed="false">ピコン</button>
-          <button type="button" class="sound-btn" data-sound="theme" aria-pressed="false">テーマ</button>
+          <button type="button" class="sound-btn" data-sound="tick" aria-pressed="false">カチッ</button>
+          <button type="button" class="sound-btn" data-sound="coin" aria-pressed="false">コイン</button>
+          <button type="button" class="sound-btn" data-sound="drop" aria-pressed="false">しずく</button>
+          <button type="button" class="sound-btn" data-sound="beep" aria-pressed="false">ビープ</button>
+          <button type="button" class="sound-btn" data-sound="sparkle" aria-pressed="false">キラッ</button>
         </div>
       </div>
-      <div class="settings-actions">
-        <button type="button" class="mute-btn" id="mute-toggle" aria-pressed="false" aria-label="効果音をオフにする">🔊 ON</button>
-        <details class="volume-control" id="volume-control">
-          <summary id="volume-summary" aria-label="音量を調節する">🎚 70%</summary>
-          <div class="volume-popover">
-            <label for="volume-slider">効果音の音量</label>
-            <div class="volume-row">
-              <input type="range" id="volume-slider" min="0" max="100" step="5" value="70" aria-describedby="volume-output">
-              <output id="volume-output" for="volume-slider">70%</output>
-            </div>
-          </div>
-        </details>
-      </div>
+      <button type="button" class="mute-btn" id="mute-toggle" aria-pressed="false" aria-label="効果音をオフにする">🔊 ON</button>
     </div>
 
     <section class="card roulette" aria-labelledby="roulette-heading">
@@ -796,12 +825,6 @@
 
     <section class="card combo" aria-labelledby="combo-heading">
       <h2 id="combo-heading">➕ 合算成功率</h2>
-      <div class="combo-mode" role="group" aria-label="合算方法">
-        <button type="button" id="mode-pool" class="active" aria-pressed="true">回数を合算</button>
-        <button type="button" id="mode-either" aria-pressed="false">どちらか成功</button>
-        <button type="button" id="mode-both" aria-pressed="false">両方成功</button>
-        <button type="button" id="mode-avg" aria-pressed="false">単純平均</button>
-      </div>
       <div class="result" role="status" aria-live="polite" aria-atomic="true">
         <span class="label" id="combo-label">合計成功回数 ÷ 合計試行回数</span>
         <span class="value" id="combo-result">—</span>
@@ -849,22 +872,63 @@
       <button type="button" class="history-clear" id="history-clear" style="display:none;">すべて削除する</button>
     </div>
     <div class="reset-area">
-      <button type="button" class="reset-toggle" id="reset-toggle" aria-expanded="false" aria-controls="reset-confirm">↺ 数値を一括リセット</button>
+      <button type="button" class="reset-toggle" id="reset-toggle" aria-expanded="false" aria-controls="reset-confirm">↺ 数値・キャッシュを一括消去</button>
       <div class="reset-confirm" id="reset-confirm" role="group" aria-labelledby="reset-confirm-title" hidden>
         <p id="reset-confirm-title">
-          4つの入力数値をリセットしますか？
-          <span class="reset-note">履歴・増減幅・音量設定は削除されません。8秒で自動的に閉じます。</span>
+          4つの入力数値とアプリキャッシュを消去しますか？
+          <span class="reset-note">履歴・増減幅・効果音設定は削除されません。8秒で自動的に閉じます。</span>
         </p>
         <div class="reset-actions">
           <button type="button" class="reset-cancel" id="reset-cancel">キャンセル</button>
-          <button type="button" class="reset-execute" id="reset-execute">リセット実行</button>
+          <button type="button" class="reset-execute" id="reset-execute">一括消去を実行</button>
         </div>
       </div>
     </div>
     <div id="status-message" class="status-message" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div id="stepper-toast-stack" class="stepper-toast-stack" role="status" aria-live="polite" aria-atomic="false"></div>
   </main>
 </div>
 
+<dialog class="install-dialog" id="install-dialog" aria-labelledby="install-title">
+  <div class="install-dialog-heading">
+    <h2 id="install-title">ホーム画面に追加</h2>
+    <button type="button" class="install-close" id="install-close" aria-label="追加手順を閉じる" autofocus>閉じる</button>
+  </div>
+  <div class="install-platforms" role="group" aria-label="使う端末">
+    <button type="button" id="install-ios" aria-pressed="true" aria-controls="install-ios-guide">iPhone・iPad</button>
+    <button type="button" id="install-android" aria-pressed="false" aria-controls="install-android-guide">Android</button>
+  </div>
+  <p class="install-note" id="install-error" role="status" hidden></p>
+  <section id="install-ios-guide" aria-labelledby="install-ios">
+    <ol>
+      <li>この計算機を<strong>Safari</strong>で開きます。</li>
+      <li>Safariの<strong>共有ボタン（四角から上向き矢印）</strong>を押します。「…」の中に「共有」がある場合もあります。</li>
+      <li>一覧を下へスクロールして<strong>「ホーム画面に追加」</strong>を選びます。</li>
+      <li>「Webアプリとして開く」が表示されたらオンにして、<strong>「追加」</strong>を押します。</li>
+    </ol>
+    <p class="install-note">「ホーム画面に追加」が見つからない場合は、共有メニュー下部の「アクションを編集」を確認してください。</p>
+    <p class="install-note">LINE・Xなどのアプリ内で開いている場合は、メニューからSafariで開くか、下のURLをコピーしてSafariに貼り付けてください。</p>
+  </section>
+  <section id="install-android-guide" aria-labelledby="install-android" hidden>
+    <ol>
+      <li>この計算機を<strong>Chrome</strong>で開きます。</li>
+      <li>Chromeの<strong>「︙」メニュー</strong>を押します。</li>
+      <li><strong>「ホーム画面に追加」</strong>または<strong>「インストールしてショートカットを作成」</strong>を選びます。</li>
+      <li>画面の案内に沿って<strong>「インストール」</strong>または<strong>「追加」</strong>を押します。</li>
+    </ol>
+    <p class="install-note">「アプリをインストール」と表示される場合もあります。追加項目がない場合は、Chromeで開き直してください。すでに追加済みの場合は、ホーム画面やアプリ一覧を確認してください。</p>
+    <p class="install-note">LINE・Xなどのアプリ内で開いている場合は、メニューからChromeで開くか、下のURLをコピーしてChromeに貼り付けてください。</p>
+  </section>
+  <div class="install-url-area" id="install-url-area">
+    <label for="install-url">この計算機のURL</label>
+    <input type="url" id="install-url" readonly spellcheck="false" autocomplete="off">
+    <button type="button" id="install-copy-url">URLをコピー</button>
+    <p class="install-feedback" id="install-copy-feedback" role="status" aria-live="polite"></p>
+  </div>
+  <p class="install-note" id="install-file-note" hidden>ホーム画面に追加するには、公開された計算機のURLをSafariまたはChromeで開いてください。</p>
+</dialog>
+
+<script src="./install.js" defer></script>
 <script src="./app.js" defer></script>
 </body>
 </html>
