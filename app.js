@@ -11,7 +11,7 @@
   const VALID_SOUNDS = new Set(['click', 'pop', 'chime', 'tick', 'coin', 'drop', 'beep', 'sparkle']);
   const APP_CACHE_PREFIX = 'success-rate-calc-';
   const STEPPER_WINDOW_MS = 30000;
-  const STEPPER_TOAST_MS = 7000;
+  const STEPPER_TOAST_MS = 120000;
   const SOUND_GAIN = 0.7;
 
   const STORAGE_PREFIX = 'success-rate-calc:v8';
