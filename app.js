@@ -40,6 +40,9 @@
   const pCopyText = byId('p-copy-text');
   const pCopyBtn = byId('p-copy-btn');
   const pSaveBtn = byId('p-save');
+  const pRefundCountEl = byId('p-refund-count');
+  const pRefundMinusBtn = byId('p-refund-minus');
+  const pRefundPlusBtn = byId('p-refund-plus');
 
   const comboResult = byId('combo-result');
   const comboLabel = byId('combo-label');
@@ -71,6 +74,7 @@
   let pData = null;
   let rRate = null;
   let pRate = null;
+  let pRefundCount = 0;
   let comboValue = null;
   let comboCounts = null;
   let comboDetail = '';
@@ -214,7 +218,8 @@
 
   function buildPigText() {
     if (!pData || pRate === null) return null;
-    return `豚${pData.total}回中${pData.success}回⭕️${fmt(pRate)}`;
+    const refundText = pRefundCount > 0 ? ` 🐷4500還元${pRefundCount}` : '';
+    return `豚${pData.total}回中${pData.success}回⭕️${fmt(pRate)}${refundText}`;
   }
 
   function buildComboText() {
@@ -323,12 +328,19 @@
     return parsed.ok ? String(parsed.value) : '';
   }
 
+  function renderRefundCount() {
+    pRefundCountEl.textContent = `${pRefundCount}人`;
+    pRefundMinusBtn.disabled = pRefundCount <= 0;
+    pRefundPlusBtn.disabled = pRefundCount >= MAX_COUNT;
+  }
+
   function saveInputs() {
     writeStoredJSON(INPUTS_KEY, {
       rSuccess: rSuccess.value,
       rTotal: rTotal.value,
       pSuccess: pSuccess.value,
       pTotal: pTotal.value,
+      pRefundCount,
     });
   }
 
@@ -340,6 +352,9 @@
     rTotal.value = normalizeStoredCount(data.rTotal);
     pSuccess.value = normalizeStoredCount(data.pSuccess);
     pTotal.value = normalizeStoredCount(data.pTotal);
+    const refundState = parseCount(String(data.pRefundCount ?? 0));
+    pRefundCount = refundState.ok ? refundState.value : 0;
+    renderRefundCount();
     if (stored.legacy) saveInputs();
   }
 
@@ -532,6 +547,7 @@
     'r-success': 'ルーレット成功回数',
     'p-total': '豚の試行回数',
     'p-success': '豚の成功回数',
+    'p-refund': '4500還元人数',
   };
 
   function hideStepperToast(summary) {
@@ -687,14 +703,16 @@
     const inputs = [rSuccess, rTotal, pSuccess, pTotal];
     setResetConfirmation(false, true);
     inputs.forEach((input) => { input.value = ''; });
+    pRefundCount = 0;
+    renderRefundCount();
     updateRoulette();
     updatePig();
     saveInputs();
     const cacheResult = await clearAppCaches();
     if (cacheResult.supported) {
-      announce('入力数値とアプリキャッシュを消去しました。履歴は残っています。');
+      announce('入力数値・4500還元人数・アプリキャッシュを消去しました。履歴は残っています。');
     } else {
-      announce('入力数値を消去しました。キャッシュはこの環境では消去できませんでした。');
+      announce('入力数値と4500還元人数を消去しました。キャッシュはこの環境では消去できませんでした。');
     }
   });
 
@@ -902,6 +920,26 @@
     });
   });
 
+  pRefundPlusBtn.addEventListener('click', () => {
+    if (pRefundCount >= MAX_COUNT) return;
+    pRefundCount += 1;
+    renderRefundCount();
+    updatePig();
+    saveInputs();
+    playClickSound();
+    recordStepperAction('p-refund', 'plus', 1);
+  });
+
+  pRefundMinusBtn.addEventListener('click', () => {
+    if (pRefundCount <= 0) return;
+    pRefundCount -= 1;
+    renderRefundCount();
+    updatePig();
+    saveInputs();
+    playClickSound();
+    recordStepperAction('p-refund', 'minus', 1);
+  });
+
   document.querySelectorAll('.stepper-row input[type="number"]').forEach((input) => {
     input.addEventListener('input', () => {
       const parsed = parseCount(input.value);
@@ -910,6 +948,7 @@
   });
 
   loadInputs();
+  renderRefundCount();
   loadSettings();
   updateRoulette();
   updatePig();

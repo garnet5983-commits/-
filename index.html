@@ -385,6 +385,45 @@
   .card.pig .result .value { color: var(--pig); }
   .card.combo .result .value { color: var(--combo); }
 
+  .refund-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid rgba(224, 138, 122, 0.35);
+    border-radius: 10px;
+    background: #181c22;
+  }
+  .refund-label { min-width: 0; }
+  .refund-label strong { display: block; color: var(--pig); font-size: 13px; }
+  .refund-label small { display: block; margin-top: 3px; color: var(--text-dim); font-size: 10px; line-height: 1.4; }
+  .refund-stepper { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .refund-count {
+    min-width: 52px;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+  .refund-btn {
+    min-width: 58px;
+    min-height: 44px;
+    padding: 7px 9px;
+    border: 1px solid var(--pig);
+    border-radius: 8px;
+    background: #0f1216;
+    color: var(--pig);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .refund-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .refund-btn:active:not(:disabled) { opacity: 0.65; }
+
   .combo-note {
     font-size: 11px;
     color: var(--text-dim);
@@ -767,6 +806,8 @@
     .row { gap: 12px; }
     .card { padding-left: 14px; padding-right: 14px; }
     .sound-options { min-width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .refund-control { align-items: stretch; flex-direction: column; }
+    .refund-stepper { justify-content: flex-end; }
   }
 </style>
 </head>
@@ -868,6 +909,17 @@
         <span class="label">成功率</span>
         <span class="value" id="p-result">—</span>
       </div>
+      <div class="refund-control" aria-label="4500還元人数">
+        <div class="refund-label">
+          <strong>🐷4500還元人数</strong>
+          <small>豚の成功率・合計数には影響しません</small>
+        </div>
+        <div class="refund-stepper">
+          <button type="button" class="refund-btn" id="p-refund-minus" aria-label="4500還元人数を1人取り消す" disabled>－取消</button>
+          <output class="refund-count" id="p-refund-count" aria-live="polite">0人</output>
+          <button type="button" class="refund-btn" id="p-refund-plus" aria-label="4500還元人数を1人追加する">＋追加</button>
+        </div>
+      </div>
       <div class="copy-row">
         <input type="text" class="copy-input" id="p-copy-text" aria-label="豚成功率のコピー用テキスト" readonly value="—">
         <button type="button" class="copy-btn" id="p-copy-btn" disabled>コピー</button>
@@ -929,7 +981,7 @@
       <button type="button" class="reset-toggle" id="reset-toggle" aria-expanded="false" aria-controls="reset-confirm">↺ 数値・キャッシュを一括消去</button>
       <div class="reset-confirm" id="reset-confirm" role="group" aria-labelledby="reset-confirm-title" hidden>
         <p id="reset-confirm-title">
-          4つの入力数値とアプリキャッシュを消去しますか？
+          4つの入力数値・4500還元人数・アプリキャッシュを消去しますか？
           <span class="reset-note">履歴・増減幅・効果音・通知表示時間は削除されません。8秒で自動的に閉じます。</span>
         </p>
         <div class="reset-actions">
