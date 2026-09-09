@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'success-rate-calc-';
-const CACHE_NAME = `${CACHE_PREFIX}v19`;
+const CACHE_NAME = `${CACHE_PREFIX}v20`;
 const APP_ROOT = new URL('./', self.location.href);
 const INDEX_URL = new URL('./index.html', self.location.href).href;
 const APP_SHELL = [

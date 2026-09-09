@@ -483,6 +483,12 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .copy-input.multiline {
+    min-height: 64px;
+    line-height: 1.55;
+    resize: none;
+    white-space: pre-wrap;
+  }
   .copy-btn {
     flex-shrink: 0;
     border: none;
@@ -909,15 +915,15 @@
         <span class="label">成功率</span>
         <span class="value" id="p-result">—</span>
       </div>
-      <div class="refund-control" aria-label="4500還元人数">
+      <div class="refund-control" aria-label="3000還元人数">
         <div class="refund-label">
-          <strong>🐷4500還元人数</strong>
+          <strong>🐷3000還元人数</strong>
           <small>豚の成功率・合計数には影響しません</small>
         </div>
         <div class="refund-stepper">
-          <button type="button" class="refund-btn" id="p-refund-minus" aria-label="4500還元人数を1人取り消す" disabled>－取消</button>
-          <output class="refund-count" id="p-refund-count" aria-live="polite">0人</output>
-          <button type="button" class="refund-btn" id="p-refund-plus" aria-label="4500還元人数を1人追加する">＋追加</button>
+          <button type="button" class="refund-btn" id="p-refund-3000-minus" aria-label="3000還元人数を1人取り消す" disabled>－取消</button>
+          <output class="refund-count" id="p-refund-3000-count" aria-live="polite">0人</output>
+          <button type="button" class="refund-btn" id="p-refund-3000-plus" aria-label="3000還元人数を1人追加する">＋追加</button>
         </div>
       </div>
       <div class="refund-control" aria-label="4000還元人数">
@@ -931,8 +937,19 @@
           <button type="button" class="refund-btn" id="p-refund-4000-plus" aria-label="4000還元人数を1人追加する">＋追加</button>
         </div>
       </div>
+      <div class="refund-control" aria-label="4500還元人数">
+        <div class="refund-label">
+          <strong>🐷4500還元人数</strong>
+          <small>豚の成功率・合計数には影響しません</small>
+        </div>
+        <div class="refund-stepper">
+          <button type="button" class="refund-btn" id="p-refund-minus" aria-label="4500還元人数を1人取り消す" disabled>－取消</button>
+          <output class="refund-count" id="p-refund-count" aria-live="polite">0人</output>
+          <button type="button" class="refund-btn" id="p-refund-plus" aria-label="4500還元人数を1人追加する">＋追加</button>
+        </div>
+      </div>
       <div class="copy-row">
-        <input type="text" class="copy-input" id="p-copy-text" aria-label="豚成功率のコピー用テキスト" readonly value="—">
+        <textarea class="copy-input multiline" id="p-copy-text" aria-label="豚成功率のコピー用テキスト" rows="2" readonly>—</textarea>
         <button type="button" class="copy-btn" id="p-copy-btn" disabled>コピー</button>
       </div>
       <div class="save-row">
@@ -964,7 +981,7 @@
 
       <div class="combo-two">
         <div class="combo-two-label">📋 ルーレット・豚 2種類まとめてコピペ</div>
-        <textarea class="combo-all-textarea" id="two-copy-text" aria-label="ルーレットと豚のコピー用テキスト" rows="2" readonly>—</textarea>
+        <textarea class="combo-all-textarea" id="two-copy-text" aria-label="ルーレットと豚のコピー用テキスト" rows="3" readonly>—</textarea>
         <div class="combo-all-copy-row">
           <button type="button" class="copy-btn" id="two-copy-btn" disabled>2種類まとめてコピー</button>
         </div>
@@ -972,7 +989,7 @@
 
       <div class="combo-all">
         <div class="combo-all-label">📋 ルーレット・豚・合算 まとめてコピペ</div>
-        <textarea class="combo-all-textarea" id="all-copy-text" aria-label="3種類のコピー用テキスト" rows="3" readonly>—</textarea>
+        <textarea class="combo-all-textarea" id="all-copy-text" aria-label="3種類のコピー用テキスト" rows="4" readonly>—</textarea>
         <div class="combo-all-copy-row">
           <button type="button" class="copy-btn" id="all-copy-btn" disabled>3種類まとめてコピー</button>
         </div>
