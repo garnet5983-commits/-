@@ -43,6 +43,9 @@
   const pRefundCountEl = byId('p-refund-count');
   const pRefundMinusBtn = byId('p-refund-minus');
   const pRefundPlusBtn = byId('p-refund-plus');
+  const pRefund4000CountEl = byId('p-refund-4000-count');
+  const pRefund4000MinusBtn = byId('p-refund-4000-minus');
+  const pRefund4000PlusBtn = byId('p-refund-4000-plus');
 
   const comboResult = byId('combo-result');
   const comboLabel = byId('combo-label');
@@ -75,6 +78,7 @@
   let rRate = null;
   let pRate = null;
   let pRefundCount = 0;
+  let pRefund4000Count = 0;
   let comboValue = null;
   let comboCounts = null;
   let comboDetail = '';
@@ -218,8 +222,9 @@
 
   function buildPigText() {
     if (!pData || pRate === null) return null;
-    const refundText = pRefundCount > 0 ? ` 🐷4500還元${pRefundCount}` : '';
-    return `豚${pData.total}回中${pData.success}回⭕️${fmt(pRate)}${refundText}`;
+    const refund4500Text = pRefundCount > 0 ? ` 🐷4500還元${pRefundCount}` : '';
+    const refund4000Text = pRefund4000Count > 0 ? ` 🐷4000還元${pRefund4000Count}` : '';
+    return `豚${pData.total}回中${pData.success}回⭕️${fmt(pRate)}${refund4500Text}${refund4000Text}`;
   }
 
   function buildComboText() {
@@ -332,6 +337,9 @@
     pRefundCountEl.textContent = `${pRefundCount}人`;
     pRefundMinusBtn.disabled = pRefundCount <= 0;
     pRefundPlusBtn.disabled = pRefundCount >= MAX_COUNT;
+    pRefund4000CountEl.textContent = `${pRefund4000Count}人`;
+    pRefund4000MinusBtn.disabled = pRefund4000Count <= 0;
+    pRefund4000PlusBtn.disabled = pRefund4000Count >= MAX_COUNT;
   }
 
   function saveInputs() {
@@ -341,6 +349,7 @@
       pSuccess: pSuccess.value,
       pTotal: pTotal.value,
       pRefundCount,
+      pRefund4000Count,
     });
   }
 
@@ -354,6 +363,8 @@
     pTotal.value = normalizeStoredCount(data.pTotal);
     const refundState = parseCount(String(data.pRefundCount ?? 0));
     pRefundCount = refundState.ok ? refundState.value : 0;
+    const refund4000State = parseCount(String(data.pRefund4000Count ?? 0));
+    pRefund4000Count = refund4000State.ok ? refund4000State.value : 0;
     renderRefundCount();
     if (stored.legacy) saveInputs();
   }
@@ -548,6 +559,7 @@
     'p-total': '豚の試行回数',
     'p-success': '豚の成功回数',
     'p-refund': '4500還元人数',
+    'p-refund-4000': '4000還元人数',
   };
 
   function hideStepperToast(summary) {
@@ -704,15 +716,16 @@
     setResetConfirmation(false, true);
     inputs.forEach((input) => { input.value = ''; });
     pRefundCount = 0;
+    pRefund4000Count = 0;
     renderRefundCount();
     updateRoulette();
     updatePig();
     saveInputs();
     const cacheResult = await clearAppCaches();
     if (cacheResult.supported) {
-      announce('入力数値・4500還元人数・アプリキャッシュを消去しました。履歴は残っています。');
+      announce('入力数値・還元人数・アプリキャッシュを消去しました。履歴は残っています。');
     } else {
-      announce('入力数値と4500還元人数を消去しました。キャッシュはこの環境では消去できませんでした。');
+      announce('入力数値と還元人数を消去しました。キャッシュはこの環境では消去できませんでした。');
     }
   });
 
@@ -938,6 +951,26 @@
     saveInputs();
     playClickSound();
     recordStepperAction('p-refund', 'minus', 1);
+  });
+
+  pRefund4000PlusBtn.addEventListener('click', () => {
+    if (pRefund4000Count >= MAX_COUNT) return;
+    pRefund4000Count += 1;
+    renderRefundCount();
+    updatePig();
+    saveInputs();
+    playClickSound();
+    recordStepperAction('p-refund-4000', 'plus', 1);
+  });
+
+  pRefund4000MinusBtn.addEventListener('click', () => {
+    if (pRefund4000Count <= 0) return;
+    pRefund4000Count -= 1;
+    renderRefundCount();
+    updatePig();
+    saveInputs();
+    playClickSound();
+    recordStepperAction('p-refund-4000', 'minus', 1);
   });
 
   document.querySelectorAll('.stepper-row input[type="number"]').forEach((input) => {

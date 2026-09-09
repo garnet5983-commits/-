@@ -920,6 +920,17 @@
           <button type="button" class="refund-btn" id="p-refund-plus" aria-label="4500還元人数を1人追加する">＋追加</button>
         </div>
       </div>
+      <div class="refund-control" aria-label="4000還元人数">
+        <div class="refund-label">
+          <strong>🐷4000還元人数</strong>
+          <small>豚の成功率・合計数には影響しません</small>
+        </div>
+        <div class="refund-stepper">
+          <button type="button" class="refund-btn" id="p-refund-4000-minus" aria-label="4000還元人数を1人取り消す" disabled>－取消</button>
+          <output class="refund-count" id="p-refund-4000-count" aria-live="polite">0人</output>
+          <button type="button" class="refund-btn" id="p-refund-4000-plus" aria-label="4000還元人数を1人追加する">＋追加</button>
+        </div>
+      </div>
       <div class="copy-row">
         <input type="text" class="copy-input" id="p-copy-text" aria-label="豚成功率のコピー用テキスト" readonly value="—">
         <button type="button" class="copy-btn" id="p-copy-btn" disabled>コピー</button>
@@ -981,7 +992,7 @@
       <button type="button" class="reset-toggle" id="reset-toggle" aria-expanded="false" aria-controls="reset-confirm">↺ 数値・キャッシュを一括消去</button>
       <div class="reset-confirm" id="reset-confirm" role="group" aria-labelledby="reset-confirm-title" hidden>
         <p id="reset-confirm-title">
-          4つの入力数値・4500還元人数・アプリキャッシュを消去しますか？
+          4つの入力数値・還元人数・アプリキャッシュを消去しますか？
           <span class="reset-note">履歴・増減幅・効果音・通知表示時間は削除されません。8秒で自動的に閉じます。</span>
         </p>
         <div class="reset-actions">
