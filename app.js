@@ -56,6 +56,14 @@
   const pRefund2000MinusBtn = byId('p-refund-2000-minus');
   const pRefund2000PlusBtn = byId('p-refund-2000-plus');
 
+  const bSuccess = byId('b-success');
+  const bTotal = byId('b-total');
+  const bError = byId('b-error');
+  const bResult = byId('b-result');
+  const bCopyText = byId('b-copy-text');
+  const bCopyBtn = byId('b-copy-btn');
+  const bSaveBtn = byId('b-save');
+
   const comboResult = byId('combo-result');
   const comboLabel = byId('combo-label');
   const comboNote = byId('combo-note');
@@ -84,8 +92,10 @@
 
   let rData = null;
   let pData = null;
+  let bData = null;
   let rRate = null;
   let pRate = null;
+  let bRate = null;
   let pRefundCount = 0;
   let pRefund4000Count = 0;
   let pRefund3000Count = 0;
@@ -245,6 +255,11 @@
     return `豚${pData.total}回中${pData.success}回⭕️${fmt(pRate)}${refundText}`;
   }
 
+  function buildBaseballText() {
+    if (!bData || bRate === null) return null;
+    return `⚾️${bData.total}回中${bData.success}回⭕️${fmt(bRate)}`;
+  }
+
   function buildComboText() {
     if (comboValue === null) return null;
     return comboCounts ? `${comboCounts.total}回中${comboCounts.success}回⭕️${fmt(comboValue)}` : null;
@@ -259,10 +274,11 @@
   function updateAllCopyText() {
     const rText = buildRouletteText();
     const pText = buildPigText();
+    const bText = buildBaseballText();
     const cText = buildComboText();
 
     if (rText && pText) {
-      const combined = `${rText}\n${pText}`;
+      const combined = [rText, pText, bText].filter(Boolean).join('\n');
       twoCopyText.value = combined;
       twoCopyText.dataset.text = combined;
       twoCopyBtn.disabled = false;
@@ -273,7 +289,7 @@
     }
 
     if (rText && pText && cText) {
-      const combined = `${rText}\n${pText}\n合算：${cText}`;
+      const combined = [...[rText, pText, bText].filter(Boolean), `合算：${cText}`].join('\n');
       allCopyText.value = combined;
       allCopyText.dataset.text = combined;
       allCopyBtn.disabled = false;
@@ -300,6 +316,15 @@
     setButtonAvailable(pSaveBtn, pRate !== null);
     setCopyOutput(pCopyText, pCopyBtn, buildPigText());
     updateCombo();
+  }
+
+  function updateBaseball() {
+    bData = validatePair(bSuccess, bTotal, bError);
+    bRate = bData ? bData.success / bData.total : null;
+    bResult.textContent = fmt(bRate);
+    setButtonAvailable(bSaveBtn, bRate !== null);
+    setCopyOutput(bCopyText, bCopyBtn, buildBaseballText());
+    updateAllCopyText();
   }
 
   function clearCombo(note) {
@@ -375,6 +400,8 @@
       rTotal: rTotal.value,
       pSuccess: pSuccess.value,
       pTotal: pTotal.value,
+      bSuccess: bSuccess.value,
+      bTotal: bTotal.value,
       pRefundCount,
       pRefund4000Count,
       pRefund3000Count,
@@ -391,6 +418,8 @@
     rTotal.value = normalizeStoredCount(data.rTotal);
     pSuccess.value = normalizeStoredCount(data.pSuccess);
     pTotal.value = normalizeStoredCount(data.pTotal);
+    bSuccess.value = normalizeStoredCount(data.bSuccess);
+    bTotal.value = normalizeStoredCount(data.bTotal);
     const refundState = parseCount(String(data.pRefundCount ?? 0));
     pRefundCount = refundState.ok ? refundState.value : 0;
     const refund4000State = parseCount(String(data.pRefund4000Count ?? 0));
@@ -407,7 +436,7 @@
 
   function normalizeHistory(raw) {
     if (!Array.isArray(raw)) return [];
-    const allowedTypes = new Set(['roulette', 'pig', 'combo']);
+    const allowedTypes = new Set(['roulette', 'pig', 'baseball', 'combo']);
     const normalized = [];
     for (const item of raw) {
       if (!item || typeof item !== 'object') continue;
@@ -594,6 +623,8 @@
     'r-success': 'ルーレット成功回数',
     'p-total': '豚の試行回数',
     'p-success': '豚の成功回数',
+    'b-total': '野球の試行回数',
+    'b-success': '野球の成功回数',
     'p-refund': '4500還元人数',
     'p-refund-4000': '4000還元人数',
     'p-refund-3000': '3000還元人数',
@@ -751,7 +782,7 @@
   }
 
   resetExecute.addEventListener('click', async () => {
-    const inputs = [rSuccess, rTotal, pSuccess, pTotal];
+    const inputs = [rSuccess, rTotal, pSuccess, pTotal, bSuccess, bTotal];
     setResetConfirmation(false, true);
     inputs.forEach((input) => { input.value = ''; });
     pRefundCount = 0;
@@ -762,6 +793,7 @@
     renderRefundCount();
     updateRoulette();
     updatePig();
+    updateBaseball();
     saveInputs();
     const cacheResult = await clearAppCaches();
     if (cacheResult.supported) {
@@ -792,6 +824,14 @@
     openHistoryAndHighlight(id);
   });
 
+  bSaveBtn.addEventListener('click', () => {
+    if (!bData || bRate === null) return;
+    const id = addRecord('baseball', '⚾️ 野球成功率', bRate, `成功${bData.success} / 試行${bData.total}`);
+    if (!id) return;
+    flashSaved(bSaveBtn);
+    openHistoryAndHighlight(id);
+  });
+
   cSaveBtn.addEventListener('click', () => {
     if (comboValue === null) return;
     const id = addRecord('combo', `➕ ${comboLabel.textContent}`, comboValue, comboDetail);
@@ -802,6 +842,7 @@
 
   rCopyBtn.addEventListener('click', () => handleCopy(rCopyText, rCopyBtn));
   pCopyBtn.addEventListener('click', () => handleCopy(pCopyText, pCopyBtn));
+  bCopyBtn.addEventListener('click', () => handleCopy(bCopyText, bCopyBtn));
   cCopyBtn.addEventListener('click', () => handleCopy(cCopyText, cCopyBtn));
   twoCopyBtn.addEventListener('click', () => handleCopy(twoCopyText, twoCopyBtn));
   allCopyBtn.addEventListener('click', () => handleCopy(allCopyText, allCopyBtn));
@@ -817,6 +858,13 @@
     input.addEventListener('input', () => {
       if (resetConfirmationIsOpen()) setResetConfirmation(false);
       updatePig();
+      saveInputs();
+    });
+  });
+  [bSuccess, bTotal].forEach((input) => {
+    input.addEventListener('input', () => {
+      if (resetConfirmationIsOpen()) setResetConfirmation(false);
+      updateBaseball();
       saveInputs();
     });
   });
@@ -1087,6 +1135,7 @@
   loadSettings();
   updateRoulette();
   updatePig();
+  updateBaseball();
   loadHistory();
 
   if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {

@@ -20,6 +20,7 @@
     --roulette: #c9a227;
     --pig: #e08a7a;
     --combo: #6fb3a8;
+    --baseball: #e4ad64;
     --text: #eef0f2;
     --text-dim: #8b93a1;
   }
@@ -191,6 +192,7 @@
   }
   .card.roulette::before { background: var(--roulette); }
   .card.pig::before { background: var(--pig); }
+  .card.baseball::before { background: var(--baseball); }
   .card.combo::before { background: var(--combo); }
 
   .card h2 {
@@ -202,6 +204,7 @@
   }
   .card.roulette h2 { color: var(--roulette); }
   .card.pig h2 { color: var(--pig); }
+  .card.baseball h2 { color: var(--baseball); }
   .card.combo h2 { color: var(--combo); }
 
   .row {
@@ -236,6 +239,7 @@
   .field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .card.roulette .field input:focus { border-color: var(--roulette); }
   .card.pig .field input:focus { border-color: var(--pig); }
+  .card.baseball .field input:focus { border-color: var(--baseball); }
   .card.combo .field input:focus { border-color: var(--combo); }
 
   .stepper-row {
@@ -383,6 +387,7 @@
   }
   .card.roulette .result .value { color: var(--roulette); }
   .card.pig .result .value { color: var(--pig); }
+  .card.baseball .result .value { color: var(--baseball); }
   .card.combo .result .value { color: var(--combo); }
 
   .refund-control {
@@ -502,6 +507,7 @@
   }
   .card.roulette .copy-btn { background: var(--roulette); }
   .card.pig .copy-btn { background: var(--pig); }
+  .card.baseball .copy-btn { background: var(--baseball); }
   .card.combo .copy-btn { background: var(--combo); }
   .copy-btn:disabled {
     background: var(--panel-edge);
@@ -568,6 +574,7 @@
   }
   .card.roulette .save-btn { background: var(--roulette); }
   .card.pig .save-btn { background: var(--pig); }
+  .card.baseball .save-btn { background: var(--baseball); }
   .card.combo .save-btn { background: var(--combo); }
   .save-btn:disabled {
     background: var(--panel-edge);
@@ -614,6 +621,7 @@
   }
   .history-item.roulette .dot { background: var(--roulette); }
   .history-item.pig .dot { background: var(--pig); }
+  .history-item.baseball .dot { background: var(--baseball); }
   .history-item.combo .dot { background: var(--combo); }
   .history-item .info { flex: 1; min-width: 0; }
   .history-item .info .top {
@@ -979,6 +987,42 @@
       </div>
     </section>
 
+    <section class="card baseball" aria-labelledby="baseball-heading">
+      <h2 id="baseball-heading">⚾️ 野球成功率</h2>
+      <div class="row">
+        <div class="field">
+          <label for="b-total">試行回数</label>
+          <input type="number" id="b-total" inputmode="numeric" min="1" max="9007199254740991" step="1" placeholder="0" autocomplete="off" aria-describedby="b-error">
+          <div class="stepper-row">
+            <button type="button" class="stepper-btn" data-target="b-total" data-op="minus" aria-label="野球の試行回数を減らす">−</button>
+            <input type="number" id="b-total-delta" inputmode="numeric" min="1" max="9007199254740991" step="1" value="1" aria-label="野球の試行回数の増減幅">
+            <button type="button" class="stepper-btn" data-target="b-total" data-op="plus" aria-label="野球の試行回数を増やす">＋</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="b-success">成功回数</label>
+          <input type="number" id="b-success" inputmode="numeric" min="0" max="9007199254740991" step="1" placeholder="0" autocomplete="off" aria-describedby="b-error">
+          <div class="stepper-row">
+            <button type="button" class="stepper-btn" data-target="b-success" data-op="minus" aria-label="野球の成功回数を減らす">−</button>
+            <input type="number" id="b-success-delta" inputmode="numeric" min="1" max="9007199254740991" step="1" value="1" aria-label="野球の成功回数の増減幅">
+            <button type="button" class="stepper-btn" data-target="b-success" data-op="plus" aria-label="野球の成功回数を増やす">＋</button>
+          </div>
+        </div>
+      </div>
+      <div class="validation-message" id="b-error" aria-live="polite"></div>
+      <div class="result" role="status" aria-live="polite" aria-atomic="true">
+        <span class="label">成功率</span>
+        <span class="value" id="b-result">—</span>
+      </div>
+      <div class="copy-row">
+        <input type="text" class="copy-input" id="b-copy-text" aria-label="野球成功率のコピー用テキスト" readonly value="—">
+        <button type="button" class="copy-btn" id="b-copy-btn" disabled>コピー</button>
+      </div>
+      <div class="save-row">
+        <button type="button" class="save-btn" id="b-save" disabled>この結果を記憶する</button>
+      </div>
+    </section>
+
     <section class="card combo" aria-labelledby="combo-heading">
       <h2 id="combo-heading">➕ 合算成功率</h2>
       <div class="result" role="status" aria-live="polite" aria-atomic="true">
@@ -1002,18 +1046,18 @@
       </div>
 
       <div class="combo-two">
-        <div class="combo-two-label">📋 ルーレット・豚 2種類まとめてコピペ</div>
-        <textarea class="combo-all-textarea" id="two-copy-text" aria-label="ルーレットと豚のコピー用テキスト" rows="3" readonly>—</textarea>
+        <div class="combo-two-label">📋 ルーレット・豚・⚾️（入力時）まとめてコピペ</div>
+        <textarea class="combo-all-textarea" id="two-copy-text" aria-label="ルーレット・豚・入力時は野球のコピー用テキスト" rows="4" readonly>—</textarea>
         <div class="combo-all-copy-row">
-          <button type="button" class="copy-btn" id="two-copy-btn" disabled>2種類まとめてコピー</button>
+          <button type="button" class="copy-btn" id="two-copy-btn" disabled>まとめてコピー</button>
         </div>
       </div>
 
       <div class="combo-all">
-        <div class="combo-all-label">📋 ルーレット・豚・合算 まとめてコピペ</div>
-        <textarea class="combo-all-textarea" id="all-copy-text" aria-label="3種類のコピー用テキスト" rows="4" readonly>—</textarea>
+        <div class="combo-all-label">📋 ルーレット・豚・⚾️（入力時）・合算 まとめてコピペ</div>
+        <textarea class="combo-all-textarea" id="all-copy-text" aria-label="ルーレット・豚・入力時は野球・合算のコピー用テキスト" rows="5" readonly>—</textarea>
         <div class="combo-all-copy-row">
-          <button type="button" class="copy-btn" id="all-copy-btn" disabled>3種類まとめてコピー</button>
+          <button type="button" class="copy-btn" id="all-copy-btn" disabled>合算込みでコピー</button>
         </div>
       </div>
 
@@ -1031,7 +1075,7 @@
       <button type="button" class="reset-toggle" id="reset-toggle" aria-expanded="false" aria-controls="reset-confirm">↺ 数値・キャッシュを一括消去</button>
       <div class="reset-confirm" id="reset-confirm" role="group" aria-labelledby="reset-confirm-title" hidden>
         <p id="reset-confirm-title">
-          4つの入力数値・還元人数・アプリキャッシュを消去しますか？
+          6つの入力数値・還元人数・アプリキャッシュを消去しますか？
           <span class="reset-note">履歴・増減幅・効果音・通知表示時間は削除されません。8秒で自動的に閉じます。</span>
         </p>
         <div class="reset-actions">
