@@ -40,6 +40,9 @@
   const pCopyText = byId('p-copy-text');
   const pCopyBtn = byId('p-copy-btn');
   const pSaveBtn = byId('p-save');
+  const pigQuickUndoBtn = byId('pig-quick-undo');
+  const pigQuickStatus = byId('pig-quick-status');
+  const pigQuickButtons = document.querySelectorAll('.pig-quick-btn');
   const pRefundCountEl = byId('p-refund-count');
   const pRefundMinusBtn = byId('p-refund-minus');
   const pRefundPlusBtn = byId('p-refund-plus');
@@ -105,6 +108,15 @@
   let pRefund3500Count = 0;
   let pRefund2500Count = 0;
   let pRefund2000Count = 0;
+  let lastQuickRecord = null;
+  const refundCounters = {
+    2000: { get: () => pRefund2000Count, set: (value) => { pRefund2000Count = value; } },
+    2500: { get: () => pRefund2500Count, set: (value) => { pRefund2500Count = value; } },
+    3000: { get: () => pRefund3000Count, set: (value) => { pRefund3000Count = value; } },
+    3500: { get: () => pRefund3500Count, set: (value) => { pRefund3500Count = value; } },
+    4000: { get: () => pRefund4000Count, set: (value) => { pRefund4000Count = value; } },
+    4500: { get: () => pRefundCount, set: (value) => { pRefundCount = value; } },
+  };
   let comboValue = null;
   let comboCounts = null;
   let comboDetail = '';
@@ -314,7 +326,14 @@
     updateCombo();
   }
 
-  function updatePig() {
+  function clearQuickUndo() {
+    lastQuickRecord = null;
+    pigQuickUndoBtn.disabled = true;
+    pigQuickStatus.textContent = '記録するとここから戻せます';
+  }
+
+  function updatePig(preserveQuickUndo = false) {
+    if (!preserveQuickUndo) clearQuickUndo();
     pData = validatePair(pSuccess, pTotal, pError);
     pRate = pData ? pData.success / pData.total : null;
     pResult.textContent = fmt(pRate);
@@ -322,6 +341,67 @@
     setCopyOutput(pCopyText, pCopyBtn, buildPigText());
     updateCombo();
   }
+
+  function recordPigResult(button) {
+    const success = button.dataset.result === 'success';
+    const amount = button.dataset.amount ? Number(button.dataset.amount) : null;
+    if (button.dataset.result !== 'failure' && !success) return;
+    if (amount !== null && (!success || !Object.hasOwn(refundCounters, amount))) return;
+
+    const totalState = parseCount(pTotal.value);
+    const successState = parseCount(pSuccess.value);
+    const blank = totalState.empty && successState.empty;
+    if (!blank && (!totalState.ok || !successState.ok || totalState.value < 1 || successState.value > totalState.value)) {
+      updatePig();
+      announce('豚の回数入力を確認してから記録してください。');
+      return;
+    }
+
+    const total = blank ? 0 : totalState.value;
+    const successful = blank ? 0 : successState.value;
+    const refund = amount === null ? null : refundCounters[amount];
+    if (total >= MAX_COUNT || (success && successful >= MAX_COUNT) || (refund && refund.get() >= MAX_COUNT)) {
+      announce('上限に達しているため記録できません。');
+      return;
+    }
+
+    const before = { total: pTotal.value, success: pSuccess.value, refund: refund?.get() ?? null };
+    pTotal.value = String(total + 1);
+    pSuccess.value = String(successful + Number(success));
+    if (refund) refund.set(refund.get() + 1);
+    lastQuickRecord = {
+      before,
+      after: { total: pTotal.value, success: pSuccess.value, refund: refund?.get() ?? null },
+      amount,
+    };
+    renderRefundCount();
+    updatePig(true);
+    saveInputs();
+    pigQuickUndoBtn.disabled = false;
+    pigQuickStatus.textContent = `直前：${success ? (amount === null ? '成功（還元なし）' : `${amount}還元の成功`) : '失敗'}を記録しました`;
+    playClickSound();
+  }
+
+  pigQuickButtons.forEach((button) => button.addEventListener('click', () => recordPigResult(button)));
+  pigQuickUndoBtn.addEventListener('click', () => {
+    const record = lastQuickRecord;
+    if (!record) return;
+    const refund = record.amount === null ? null : refundCounters[record.amount];
+    if (pTotal.value !== record.after.total || pSuccess.value !== record.after.success ||
+        (refund && refund.get() !== record.after.refund)) {
+      clearQuickUndo();
+      announce('数値が変更されているため、直前の記録を取り消せません。');
+      return;
+    }
+    pTotal.value = record.before.total;
+    pSuccess.value = record.before.success;
+    if (refund) refund.set(record.before.refund);
+    renderRefundCount();
+    updatePig();
+    saveInputs();
+    pigQuickStatus.textContent = '直前の記録を取り消しました';
+    playClickSound();
+  });
 
   function updateBaseball() {
     bData = validatePair(bSuccess, bTotal, bError);

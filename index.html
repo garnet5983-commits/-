@@ -429,6 +429,48 @@
   .refund-btn:disabled { opacity: 0.35; cursor: not-allowed; }
   .refund-btn:active:not(:disabled) { opacity: 0.65; }
 
+  .pig-quick {
+    border: 1px solid rgba(224, 138, 122, 0.45);
+    background: #241d1f;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+  .pig-quick-title { color: var(--pig); font-size: 14px; font-weight: 700; }
+  .pig-quick-help { margin: 5px 0 11px; color: var(--text-dim); font-size: 11px; line-height: 1.5; }
+  .pig-quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .pig-quick-btn {
+    border: 1px solid var(--pig);
+    background: #16191f;
+    border-radius: 9px;
+    color: var(--pig);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    min-height: 50px;
+    padding: 8px 4px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .pig-quick-btn:active { background: #39262a; }
+  .pig-quick-btn.failure { color: #e0e4ec; border-color: #777f8b; }
+  .pig-quick-undo-row { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
+  .pig-quick-undo {
+    flex-shrink: 0;
+    min-height: 44px;
+    border: 1px solid #aab2bd;
+    background: #242932;
+    color: #e0e4ec;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+  .pig-quick-undo:disabled { opacity: 0.4; cursor: not-allowed; }
+  .pig-quick-status { color: var(--text-dim); font-size: 11px; line-height: 1.4; }
+
   .combo-note {
     font-size: 11px;
     color: var(--text-dim);
@@ -898,6 +940,24 @@
 
     <section class="card pig" aria-labelledby="pig-heading">
       <h2 id="pig-heading">🐷 豚成功率</h2>
+      <div class="pig-quick" aria-label="豚の結果を1回で記録">
+        <div class="pig-quick-title">結果を1回で記録</div>
+        <p class="pig-quick-help">1タップで試行・成功・還元人数を反映。下の＋ボタンを重ねて押す必要はありません。</p>
+        <div class="pig-quick-grid" role="group" aria-label="豚の結果を記録">
+          <button type="button" class="pig-quick-btn failure" data-result="failure">✕ 失敗</button>
+          <button type="button" class="pig-quick-btn" data-result="success">⭕️ 成功（還元なし）</button>
+          <button type="button" class="pig-quick-btn" data-result="success" data-amount="2000">⭕️ 2000還元</button>
+          <button type="button" class="pig-quick-btn" data-result="success" data-amount="2500">⭕️ 2500還元</button>
+          <button type="button" class="pig-quick-btn" data-result="success" data-amount="3000">⭕️ 3000還元</button>
+          <button type="button" class="pig-quick-btn" data-result="success" data-amount="3500">⭕️ 3500還元</button>
+          <button type="button" class="pig-quick-btn" data-result="success" data-amount="4000">⭕️ 4000還元</button>
+          <button type="button" class="pig-quick-btn" data-result="success" data-amount="4500">⭕️ 4500還元</button>
+        </div>
+        <div class="pig-quick-undo-row">
+          <button type="button" class="pig-quick-undo" id="pig-quick-undo" disabled>↶ 直前の記録を取り消す</button>
+          <span class="pig-quick-status" id="pig-quick-status" role="status" aria-live="polite">記録するとここから戻せます</span>
+        </div>
+      </div>
       <div class="row">
         <div class="field">
           <label for="p-total">試行回数</label>
