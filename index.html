@@ -453,7 +453,7 @@
     touch-action: manipulation;
   }
   .pig-quick-btn:active { background: #39262a; }
-  .pig-quick-btn.failure { color: #e0e4ec; border-color: #777f8b; }
+  .pig-quick-btn.failure { grid-column: 1 / -1; color: #e0e4ec; border-color: #777f8b; }
   .pig-quick-undo-row { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
   .pig-quick-undo {
     flex-shrink: 0;
@@ -470,6 +470,10 @@
   }
   .pig-quick-undo:disabled { opacity: 0.4; cursor: not-allowed; }
   .pig-quick-status { color: var(--text-dim); font-size: 11px; line-height: 1.4; }
+  .pig-quick-copy-label { margin-top: 14px; color: var(--pig); font-size: 12px; font-weight: 700; }
+  .pig-quick .copy-row { flex-direction: column; }
+  .pig-quick .copy-row .copy-input { width: 100%; }
+  .pig-quick .copy-row .copy-btn { min-height: 48px; width: 100%; font-size: 14px; }
 
   .combo-note {
     font-size: 11px;
@@ -945,7 +949,6 @@
         <p class="pig-quick-help">1タップで試行・成功・還元人数を反映。下の＋ボタンを重ねて押す必要はありません。</p>
         <div class="pig-quick-grid" role="group" aria-label="豚の結果を記録">
           <button type="button" class="pig-quick-btn failure" data-result="failure">✕ 失敗</button>
-          <button type="button" class="pig-quick-btn" data-result="success">⭕️ 成功（還元なし）</button>
           <button type="button" class="pig-quick-btn" data-result="success" data-amount="2000">⭕️ 2000還元</button>
           <button type="button" class="pig-quick-btn" data-result="success" data-amount="2500">⭕️ 2500還元</button>
           <button type="button" class="pig-quick-btn" data-result="success" data-amount="3000">⭕️ 3000還元</button>
@@ -954,8 +957,13 @@
           <button type="button" class="pig-quick-btn" data-result="success" data-amount="4500">⭕️ 4500還元</button>
         </div>
         <div class="pig-quick-undo-row">
-          <button type="button" class="pig-quick-undo" id="pig-quick-undo" disabled>↶ 直前の記録を取り消す</button>
-          <span class="pig-quick-status" id="pig-quick-status" role="status" aria-live="polite">記録するとここから戻せます</span>
+          <button type="button" class="pig-quick-undo" id="pig-quick-undo" disabled>↶ 記録を1件戻す</button>
+          <span class="pig-quick-status" id="pig-quick-status" role="status" aria-live="polite">記録すると順番に戻せます</span>
+        </div>
+        <div class="pig-quick-copy-label">📋 現在の豚の結果をコピペ</div>
+        <div class="copy-row">
+          <textarea class="copy-input multiline" id="p-copy-text" aria-label="豚成功率のコピー用テキスト" rows="2" readonly>—</textarea>
+          <button type="button" class="copy-btn" id="p-copy-btn" disabled>結果をコピー</button>
         </div>
       </div>
       <div class="row">
@@ -1048,10 +1056,6 @@
           <output class="refund-count" id="p-refund-count" aria-live="polite">0人</output>
           <button type="button" class="refund-btn" id="p-refund-plus" aria-label="4500還元人数を1人追加する">＋追加</button>
         </div>
-      </div>
-      <div class="copy-row">
-        <textarea class="copy-input multiline" id="p-copy-text" aria-label="豚成功率のコピー用テキスト" rows="2" readonly>—</textarea>
-        <button type="button" class="copy-btn" id="p-copy-btn" disabled>コピー</button>
       </div>
       <div class="save-row">
         <button type="button" class="save-btn" id="p-save" disabled>この結果を記憶する</button>

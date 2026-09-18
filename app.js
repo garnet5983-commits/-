@@ -14,6 +14,7 @@
   const DEFAULT_TOAST_SECONDS = 60;
   const MIN_TOAST_SECONDS = 1;
   const MAX_TOAST_SECONDS = 600;
+  const QUICK_UNDO_LIMIT = 500;
   const SOUND_GAIN = 0.7;
 
   const STORAGE_PREFIX = 'success-rate-calc:v8';
@@ -108,7 +109,7 @@
   let pRefund3500Count = 0;
   let pRefund2500Count = 0;
   let pRefund2000Count = 0;
-  let lastQuickRecord = null;
+  let quickRecords = [];
   const refundCounters = {
     2000: { get: () => pRefund2000Count, set: (value) => { pRefund2000Count = value; } },
     2500: { get: () => pRefund2500Count, set: (value) => { pRefund2500Count = value; } },
@@ -326,10 +327,16 @@
     updateCombo();
   }
 
+  function refreshQuickUndo() {
+    const remaining = quickRecords.length;
+    pigQuickUndoBtn.disabled = remaining === 0;
+    pigQuickUndoBtn.textContent = remaining > 0 ? `↶ 記録を1件戻す（${remaining}件）` : '↶ 記録を1件戻す';
+  }
+
   function clearQuickUndo() {
-    lastQuickRecord = null;
-    pigQuickUndoBtn.disabled = true;
-    pigQuickStatus.textContent = '記録するとここから戻せます';
+    quickRecords = [];
+    refreshQuickUndo();
+    pigQuickStatus.textContent = '記録すると順番に戻せます';
   }
 
   function updatePig(preserveQuickUndo = false) {
@@ -345,14 +352,14 @@
   function recordPigResult(button) {
     const success = button.dataset.result === 'success';
     const amount = button.dataset.amount ? Number(button.dataset.amount) : null;
-    if (button.dataset.result !== 'failure' && !success) return;
-    if (amount !== null && (!success || !Object.hasOwn(refundCounters, amount))) return;
+    if (success ? !refundCounters[amount] : button.dataset.result !== 'failure' || amount !== null) return;
 
     const totalState = parseCount(pTotal.value);
     const successState = parseCount(pSuccess.value);
     const blank = totalState.empty && successState.empty;
     if (!blank && (!totalState.ok || !successState.ok || totalState.value < 1 || successState.value > totalState.value)) {
       updatePig();
+      saveInputs();
       announce('豚の回数入力を確認してから記録してください。');
       return;
     }
@@ -369,37 +376,49 @@
     pTotal.value = String(total + 1);
     pSuccess.value = String(successful + Number(success));
     if (refund) refund.set(refund.get() + 1);
-    lastQuickRecord = {
+    quickRecords.push({
       before,
       after: { total: pTotal.value, success: pSuccess.value, refund: refund?.get() ?? null },
       amount,
-    };
+    });
+    if (quickRecords.length > QUICK_UNDO_LIMIT) quickRecords.shift();
     renderRefundCount();
     updatePig(true);
     saveInputs();
-    pigQuickUndoBtn.disabled = false;
-    pigQuickStatus.textContent = `直前：${success ? (amount === null ? '成功（還元なし）' : `${amount}還元の成功`) : '失敗'}を記録しました`;
+    refreshQuickUndo();
+    pigQuickStatus.textContent = `直前：${success ? `${amount}還元の成功` : '失敗'}を記録しました`;
+    recordStepperAction(`pig-quick-${amount ?? 'failure'}`, 'plus', 1, (presses) =>
+      success
+        ? `🐷${amount}還元成功：${presses}回記録（試行＋${presses}・成功＋${presses}・還元＋${presses}）`
+        : `🐷失敗：${presses}回記録（試行＋${presses}）`);
     playClickSound();
   }
 
   pigQuickButtons.forEach((button) => button.addEventListener('click', () => recordPigResult(button)));
   pigQuickUndoBtn.addEventListener('click', () => {
-    const record = lastQuickRecord;
+    const record = quickRecords[quickRecords.length - 1];
     if (!record) return;
     const refund = record.amount === null ? null : refundCounters[record.amount];
     if (pTotal.value !== record.after.total || pSuccess.value !== record.after.success ||
         (refund && refund.get() !== record.after.refund)) {
       clearQuickUndo();
-      announce('数値が変更されているため、直前の記録を取り消せません。');
+      saveInputs();
+      announce('数値が変更されているため、記録を取り消せません。');
       return;
     }
     pTotal.value = record.before.total;
     pSuccess.value = record.before.success;
     if (refund) refund.set(record.before.refund);
+    quickRecords.pop();
     renderRefundCount();
-    updatePig();
+    updatePig(true);
     saveInputs();
-    pigQuickStatus.textContent = '直前の記録を取り消しました';
+    refreshQuickUndo();
+    pigQuickStatus.textContent = `直前の${record.amount === null ? '失敗' : `${record.amount}還元の成功`}を取り消しました`;
+    recordStepperAction(`pig-quick-${record.amount ?? 'failure'}`, 'minus', 1, (presses) =>
+      record.amount === null
+        ? `↶ 🐷失敗を${presses}回取り消し（試行－${presses}）`
+        : `↶ 🐷${record.amount}還元成功を${presses}回取り消し（試行－${presses}・成功－${presses}・還元－${presses}）`);
     playClickSound();
   });
 
@@ -496,7 +515,41 @@
       pRefund3500Count,
       pRefund2500Count,
       pRefund2000Count,
+      quickRecords,
     });
+  }
+
+  function normalizeQuickRecords(raw) {
+    if (!Array.isArray(raw)) return [];
+    const records = [];
+    for (const record of raw.slice(-QUICK_UNDO_LIMIT)) {
+      if (!record || typeof record !== 'object' || !record.before || !record.after) return [];
+      const { before, after, amount } = record;
+      if (typeof before.total !== 'string' || typeof before.success !== 'string' ||
+          typeof after.total !== 'string' || typeof after.success !== 'string') return [];
+      const beforeTotal = parseCount(before.total);
+      const beforeSuccess = parseCount(before.success);
+      const empty = beforeTotal.empty && beforeSuccess.empty;
+      if (!empty && (!beforeTotal.ok || !beforeSuccess.ok || beforeTotal.value < 1 ||
+          beforeSuccess.value > beforeTotal.value)) return [];
+      const total = empty ? 0 : beforeTotal.value;
+      const success = empty ? 0 : beforeSuccess.value;
+      if (total >= MAX_COUNT || after.total !== String(total + 1) ||
+          after.success !== String(success + Number(amount !== null))) return [];
+      if (amount === null) {
+        if (before.refund !== null || after.refund !== null) return [];
+      } else if (!refundCounters[amount] || !Number.isSafeInteger(before.refund) ||
+          before.refund < 0 || before.refund >= MAX_COUNT || after.refund !== before.refund + 1) return [];
+      if (records.length > 0) {
+        const previous = records[records.length - 1];
+        if (previous.after.total !== before.total || previous.after.success !== before.success) return [];
+      }
+      records.push(record);
+    }
+    const latest = records[records.length - 1];
+    if (latest && (latest.after.total !== pTotal.value || latest.after.success !== pSuccess.value ||
+        (latest.amount !== null && refundCounters[latest.amount].get() !== latest.after.refund))) return [];
+    return records;
   }
 
   function loadInputs() {
@@ -521,7 +574,10 @@
     pRefund2500Count = refund2500State.ok ? refund2500State.value : 0;
     const refund2000State = parseCount(String(data.pRefund2000Count ?? 0));
     pRefund2000Count = refund2000State.ok ? refund2000State.value : 0;
+    quickRecords = normalizeQuickRecords(data.quickRecords);
     renderRefundCount();
+    refreshQuickUndo();
+    if (quickRecords.length) pigQuickStatus.textContent = `${quickRecords.length}件の記録を順番に戻せます`;
     if (stored.legacy) saveInputs();
   }
 
@@ -743,7 +799,7 @@
     summary.hideTimer = window.setTimeout(() => hideStepperToast(summary), remaining);
   }
 
-  function recordStepperAction(targetId, operation, amount) {
+  function recordStepperAction(targetId, operation, amount, formatMessage = null) {
     if (amount <= 0) return;
     const now = Date.now();
     const key = `${targetId}:${operation}`;
@@ -777,7 +833,8 @@
       dismissButton.type = 'button';
       dismissButton.className = 'stepper-toast-dismiss';
       dismissButton.textContent = '消去';
-      dismissButton.setAttribute('aria-label', `${STEPPER_LABELS[targetId] || '数値'}の操作メッセージを消す`);
+      const label = targetId.startsWith('pig-quick-') ? '豚のワンタップ記録' : (STEPPER_LABELS[targetId] || '数値');
+      dismissButton.setAttribute('aria-label', `${label}の操作メッセージを消す`);
       dismissButton.addEventListener('click', () => {
         const activeSummary = stepperSummaries.get(key);
         if (activeSummary?.toast !== summary.toast) return;
@@ -789,7 +846,9 @@
 
     const action = operation === 'plus' ? 'プラス' : 'マイナス';
     const sign = operation === 'plus' ? '＋' : '－';
-    summary.message.textContent = `${STEPPER_LABELS[targetId] || '数値'}：${action}${summary.presses}回（合計${sign}${summary.amount}）`;
+    summary.message.textContent = formatMessage
+      ? formatMessage(summary.presses, summary.amount)
+      : `${STEPPER_LABELS[targetId] || '数値'}：${action}${summary.presses}回（合計${sign}${summary.amount}）`;
     summary.lastUpdatedAt = now;
     scheduleStepperToastHide(summary);
   }
@@ -1247,7 +1306,7 @@
   renderRefundCount();
   loadSettings();
   updateRoulette();
-  updatePig();
+  updatePig(true);
   updateBaseball();
   loadHistory();
 
