@@ -49,6 +49,9 @@
   const pRefund3000CountEl = byId('p-refund-3000-count');
   const pRefund3000MinusBtn = byId('p-refund-3000-minus');
   const pRefund3000PlusBtn = byId('p-refund-3000-plus');
+  const pRefund3500CountEl = byId('p-refund-3500-count');
+  const pRefund3500MinusBtn = byId('p-refund-3500-minus');
+  const pRefund3500PlusBtn = byId('p-refund-3500-plus');
   const pRefund2500CountEl = byId('p-refund-2500-count');
   const pRefund2500MinusBtn = byId('p-refund-2500-minus');
   const pRefund2500PlusBtn = byId('p-refund-2500-plus');
@@ -99,6 +102,7 @@
   let pRefundCount = 0;
   let pRefund4000Count = 0;
   let pRefund3000Count = 0;
+  let pRefund3500Count = 0;
   let pRefund2500Count = 0;
   let pRefund2000Count = 0;
   let comboValue = null;
@@ -248,6 +252,7 @@
       pRefund2000Count > 0 ? `2000🐷${pRefund2000Count}回` : null,
       pRefund2500Count > 0 ? `2500🐷${pRefund2500Count}回` : null,
       pRefund3000Count > 0 ? `3000🐷${pRefund3000Count}回` : null,
+      pRefund3500Count > 0 ? `3500🐷${pRefund3500Count}回` : null,
       pRefund4000Count > 0 ? `4000🐷${pRefund4000Count}回` : null,
       pRefundCount > 0 ? `4500🐷${pRefundCount}回` : null,
     ].filter(Boolean);
@@ -386,6 +391,9 @@
     pRefund3000CountEl.textContent = `${pRefund3000Count}人`;
     pRefund3000MinusBtn.disabled = pRefund3000Count <= 0;
     pRefund3000PlusBtn.disabled = pRefund3000Count >= MAX_COUNT;
+    pRefund3500CountEl.textContent = `${pRefund3500Count}人`;
+    pRefund3500MinusBtn.disabled = pRefund3500Count <= 0;
+    pRefund3500PlusBtn.disabled = pRefund3500Count >= MAX_COUNT;
     pRefund2500CountEl.textContent = `${pRefund2500Count}人`;
     pRefund2500MinusBtn.disabled = pRefund2500Count <= 0;
     pRefund2500PlusBtn.disabled = pRefund2500Count >= MAX_COUNT;
@@ -405,6 +413,7 @@
       pRefundCount,
       pRefund4000Count,
       pRefund3000Count,
+      pRefund3500Count,
       pRefund2500Count,
       pRefund2000Count,
     });
@@ -426,6 +435,8 @@
     pRefund4000Count = refund4000State.ok ? refund4000State.value : 0;
     const refund3000State = parseCount(String(data.pRefund3000Count ?? 0));
     pRefund3000Count = refund3000State.ok ? refund3000State.value : 0;
+    const refund3500State = parseCount(String(data.pRefund3500Count ?? 0));
+    pRefund3500Count = refund3500State.ok ? refund3500State.value : 0;
     const refund2500State = parseCount(String(data.pRefund2500Count ?? 0));
     pRefund2500Count = refund2500State.ok ? refund2500State.value : 0;
     const refund2000State = parseCount(String(data.pRefund2000Count ?? 0));
@@ -628,6 +639,7 @@
     'p-refund': '4500還元人数',
     'p-refund-4000': '4000還元人数',
     'p-refund-3000': '3000還元人数',
+    'p-refund-3500': '3500還元人数',
     'p-refund-2500': '2500還元人数',
     'p-refund-2000': '2000還元人数',
   };
@@ -788,6 +800,7 @@
     pRefundCount = 0;
     pRefund4000Count = 0;
     pRefund3000Count = 0;
+    pRefund3500Count = 0;
     pRefund2500Count = 0;
     pRefund2000Count = 0;
     renderRefundCount();
@@ -1081,6 +1094,26 @@
     saveInputs();
     playClickSound();
     recordStepperAction('p-refund-3000', 'minus', 1);
+  });
+
+  pRefund3500PlusBtn.addEventListener('click', () => {
+    if (pRefund3500Count >= MAX_COUNT) return;
+    pRefund3500Count += 1;
+    renderRefundCount();
+    updatePig();
+    saveInputs();
+    playClickSound();
+    recordStepperAction('p-refund-3500', 'plus', 1);
+  });
+
+  pRefund3500MinusBtn.addEventListener('click', () => {
+    if (pRefund3500Count <= 0) return;
+    pRefund3500Count -= 1;
+    renderRefundCount();
+    updatePig();
+    saveInputs();
+    playClickSound();
+    recordStepperAction('p-refund-3500', 'minus', 1);
   });
 
   pRefund2500PlusBtn.addEventListener('click', () => {
