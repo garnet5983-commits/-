@@ -32,7 +32,6 @@
   const rResult = byId('r-result');
   const rCopyText = byId('r-copy-text');
   const rCopyBtn = byId('r-copy-btn');
-  const rSaveBtn = byId('r-save');
 
   const pSuccess = byId('p-success');
   const pTotal = byId('p-total');
@@ -40,7 +39,6 @@
   const pResult = byId('p-result');
   const pCopyText = byId('p-copy-text');
   const pCopyBtn = byId('p-copy-btn');
-  const pSaveBtn = byId('p-save');
   const pigQuickUndoBtn = byId('pig-quick-undo');
   const pigQuickStatus = byId('pig-quick-status');
   const pigQuickButtons = document.querySelectorAll('.pig-quick-btn');
@@ -63,14 +61,6 @@
   const pRefund2000MinusBtn = byId('p-refund-2000-minus');
   const pRefund2000PlusBtn = byId('p-refund-2000-plus');
 
-  const bSuccess = byId('b-success');
-  const bTotal = byId('b-total');
-  const bError = byId('b-error');
-  const bResult = byId('b-result');
-  const bCopyText = byId('b-copy-text');
-  const bCopyBtn = byId('b-copy-btn');
-  const bSaveBtn = byId('b-save');
-
   const comboResult = byId('combo-result');
   const comboLabel = byId('combo-label');
   const comboNote = byId('combo-note');
@@ -79,7 +69,6 @@
   const comboTotalEl = byId('combo-total');
   const cCopyText = byId('c-copy-text');
   const cCopyBtn = byId('c-copy-btn');
-  const cSaveBtn = byId('c-save');
   const twoCopyText = byId('two-copy-text');
   const twoCopyBtn = byId('two-copy-btn');
   const allCopyText = byId('all-copy-text');
@@ -89,6 +78,7 @@
   const historyPanel = byId('history-panel');
   const historyList = byId('history-list');
   const historyClear = byId('history-clear');
+  const snapshotSaveBtn = byId('snapshot-save');
   const resetToggle = byId('reset-toggle');
   const resetConfirm = byId('reset-confirm');
   const resetCancel = byId('reset-cancel');
@@ -99,10 +89,8 @@
 
   let rData = null;
   let pData = null;
-  let bData = null;
   let rRate = null;
   let pRate = null;
-  let bRate = null;
   let pRefundCount = 0;
   let pRefund4000Count = 0;
   let pRefund3000Count = 0;
@@ -124,6 +112,9 @@
   let historyData = [];
   let statusTimer = null;
   let resetConfirmTimer = null;
+  let restoreBackup = null;
+  let restoreToast = null;
+  let applyingSnapshot = false;
   const stepperSummaries = new Map();
   let nonCriticalStorageWarningShown = false;
   const feedbackTimers = new WeakMap();
@@ -273,11 +264,6 @@
     return `豚${pData.total}回中${pData.success}回⭕️${fmt(pRate)}${refundText}`;
   }
 
-  function buildBaseballText() {
-    if (!bData || bRate === null) return null;
-    return `⚾️${bData.total}回中${bData.success}回⭕️${fmt(bRate)}`;
-  }
-
   function buildComboText() {
     if (comboValue === null) return null;
     return comboCounts ? `${comboCounts.total}回中${comboCounts.success}回⭕️${fmt(comboValue)}` : null;
@@ -292,11 +278,10 @@
   function updateAllCopyText() {
     const rText = buildRouletteText();
     const pText = buildPigText();
-    const bText = buildBaseballText();
     const cText = buildComboText();
 
     if (rText && pText) {
-      const combined = [rText, pText, bText].filter(Boolean).join('\n');
+      const combined = [rText, pText].join('\n');
       twoCopyText.value = combined;
       twoCopyText.dataset.text = combined;
       twoCopyBtn.disabled = false;
@@ -307,7 +292,7 @@
     }
 
     if (rText && pText && cText) {
-      const combined = [...[rText, pText, bText].filter(Boolean), `合算：${cText}`].join('\n');
+      const combined = [rText, pText, `合算：${cText}`].join('\n');
       allCopyText.value = combined;
       allCopyText.dataset.text = combined;
       allCopyBtn.disabled = false;
@@ -322,7 +307,6 @@
     rData = validatePair(rSuccess, rTotal, rError);
     rRate = rData ? rData.success / rData.total : null;
     rResult.textContent = fmt(rRate);
-    setButtonAvailable(rSaveBtn, rRate !== null);
     setCopyOutput(rCopyText, rCopyBtn, buildRouletteText());
     updateCombo();
   }
@@ -344,9 +328,103 @@
     pData = validatePair(pSuccess, pTotal, pError);
     pRate = pData ? pData.success / pData.total : null;
     pResult.textContent = fmt(pRate);
-    setButtonAvailable(pSaveBtn, pRate !== null);
     setCopyOutput(pCopyText, pCopyBtn, buildPigText());
     updateCombo();
+  }
+
+  function captureSnapshot() {
+    return {
+      rSuccess: rSuccess.value,
+      rTotal: rTotal.value,
+      pSuccess: pSuccess.value,
+      pTotal: pTotal.value,
+      pRefundCount,
+      pRefund4000Count,
+      pRefund3500Count,
+      pRefund3000Count,
+      pRefund2500Count,
+      pRefund2000Count,
+    };
+  }
+
+  function normalizeSnapshot(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const normalizeSnapshotCount = (value) => {
+      const parsed = parseCount(String(value ?? ''));
+      if (parsed.empty) return '';
+      return parsed.ok ? String(parsed.value) : null;
+    };
+    const snapshot = {
+      rSuccess: normalizeSnapshotCount(raw.rSuccess),
+      rTotal: normalizeSnapshotCount(raw.rTotal),
+      pSuccess: normalizeSnapshotCount(raw.pSuccess),
+      pTotal: normalizeSnapshotCount(raw.pTotal),
+    };
+    if (Object.values(snapshot).some((value) => value === null)) return null;
+    for (const key of ['pRefundCount', 'pRefund4000Count', 'pRefund3500Count', 'pRefund3000Count', 'pRefund2500Count', 'pRefund2000Count']) {
+      const parsed = parseCount(String(raw[key] ?? 0));
+      if (!parsed.ok) return null;
+      snapshot[key] = parsed.value;
+    }
+    for (const prefix of ['r', 'p']) {
+      const success = parseCount(snapshot[`${prefix}Success`]);
+      const total = parseCount(snapshot[`${prefix}Total`]);
+      const empty = success.empty && total.empty;
+      if (!empty && (!success.ok || !total.ok || total.value < 1 || success.value > total.value)) return null;
+    }
+    return snapshot;
+  }
+
+  function snapshotHasContent(snapshot) {
+    return Boolean(snapshot.rSuccess || snapshot.rTotal || snapshot.pSuccess || snapshot.pTotal ||
+      snapshot.pRefundCount || snapshot.pRefund4000Count || snapshot.pRefund3500Count ||
+      snapshot.pRefund3000Count || snapshot.pRefund2500Count || snapshot.pRefund2000Count);
+  }
+
+  function snapshotPairText(name, successValue, totalValue) {
+    const success = parseCount(successValue);
+    const total = parseCount(totalValue);
+    if (!success.ok || !total.ok || total.value < 1 || success.value > total.value) return null;
+    return `${name}${total.value}回中${success.value}回⭕️${fmt(success.value / total.value)}`;
+  }
+
+  function buildSnapshotText(snapshot) {
+    const lines = [];
+    const roulette = snapshotPairText('ルレ', snapshot.rSuccess, snapshot.rTotal);
+    const pig = snapshotPairText('豚', snapshot.pSuccess, snapshot.pTotal);
+    if (roulette) lines.push(roulette);
+    if (pig) {
+      lines.push(pig);
+      const refunds = [
+        [2000, snapshot.pRefund2000Count], [2500, snapshot.pRefund2500Count],
+        [3000, snapshot.pRefund3000Count], [3500, snapshot.pRefund3500Count],
+        [4000, snapshot.pRefund4000Count], [4500, snapshot.pRefundCount],
+      ].filter(([, count]) => count > 0).map(([amount, count]) => `${amount}🐷${count}回`);
+      if (refunds.length) lines.push(refunds.join('　'));
+    }
+    const rSuccessState = parseCount(snapshot.rSuccess);
+    const rTotalState = parseCount(snapshot.rTotal);
+    const pSuccessState = parseCount(snapshot.pSuccess);
+    const pTotalState = parseCount(snapshot.pTotal);
+    if (roulette && pig) {
+      const totalSuccess = rSuccessState.value + pSuccessState.value;
+      const totalTrials = rTotalState.value + pTotalState.value;
+      lines.push(`合算：${totalTrials}回中${totalSuccess}回⭕️${fmt(totalSuccess / totalTrials)}`);
+    }
+    if (!lines.length) {
+      const refunds = [
+        [2000, snapshot.pRefund2000Count], [2500, snapshot.pRefund2500Count],
+        [3000, snapshot.pRefund3000Count], [3500, snapshot.pRefund3500Count],
+        [4000, snapshot.pRefund4000Count], [4500, snapshot.pRefundCount],
+      ].filter(([, count]) => count > 0).map(([amount, count]) => `${amount}🐷${count}回`);
+      if (refunds.length) lines.push(refunds.join('　'));
+    }
+    return lines.join('\n');
+  }
+
+  function updateSnapshotSaveButton() {
+    const snapshot = normalizeSnapshot(captureSnapshot());
+    setButtonAvailable(snapshotSaveBtn, Boolean(snapshot && snapshotHasContent(snapshot)));
   }
 
   function recordPigResult(button) {
@@ -422,15 +500,6 @@
     playClickSound();
   });
 
-  function updateBaseball() {
-    bData = validatePair(bSuccess, bTotal, bError);
-    bRate = bData ? bData.success / bData.total : null;
-    bResult.textContent = fmt(bRate);
-    setButtonAvailable(bSaveBtn, bRate !== null);
-    setCopyOutput(bCopyText, bCopyBtn, buildBaseballText());
-    updateAllCopyText();
-  }
-
   function clearCombo(note) {
     comboResult.textContent = '—';
     comboNote.textContent = note;
@@ -438,9 +507,9 @@
     comboCounts = null;
     comboDetail = '';
     comboBreakdown.style.display = 'none';
-    setButtonAvailable(cSaveBtn, false);
     setCopyOutput(cCopyText, cCopyBtn, null);
     updateAllCopyText();
+    updateSnapshotSaveButton();
   }
 
   function updateCombo() {
@@ -469,9 +538,9 @@
     comboSuccessEl.textContent = `${totalSuccess}（${rData.success} + ${pData.success}）`;
     comboTotalEl.textContent = `${totalTrials}（${rData.total} + ${pData.total}）`;
 
-    setButtonAvailable(cSaveBtn, true);
     setCopyOutput(cCopyText, cCopyBtn, buildComboText());
     updateAllCopyText();
+    updateSnapshotSaveButton();
   }
 
   function normalizeStoredCount(value) {
@@ -499,16 +568,16 @@
     pRefund2000CountEl.textContent = `${pRefund2000Count}人`;
     pRefund2000MinusBtn.disabled = pRefund2000Count <= 0;
     pRefund2000PlusBtn.disabled = pRefund2000Count >= MAX_COUNT;
+    updateSnapshotSaveButton();
   }
 
   function saveInputs() {
+    if (!applyingSnapshot) clearRestoreOffer();
     writeStoredJSON(INPUTS_KEY, {
       rSuccess: rSuccess.value,
       rTotal: rTotal.value,
       pSuccess: pSuccess.value,
       pTotal: pTotal.value,
-      bSuccess: bSuccess.value,
-      bTotal: bTotal.value,
       pRefundCount,
       pRefund4000Count,
       pRefund3000Count,
@@ -560,8 +629,6 @@
     rTotal.value = normalizeStoredCount(data.rTotal);
     pSuccess.value = normalizeStoredCount(data.pSuccess);
     pTotal.value = normalizeStoredCount(data.pTotal);
-    bSuccess.value = normalizeStoredCount(data.bSuccess);
-    bTotal.value = normalizeStoredCount(data.bTotal);
     const refundState = parseCount(String(data.pRefundCount ?? 0));
     pRefundCount = refundState.ok ? refundState.value : 0;
     const refund4000State = parseCount(String(data.pRefund4000Count ?? 0));
@@ -583,21 +650,33 @@
 
   function normalizeHistory(raw) {
     if (!Array.isArray(raw)) return [];
-    const allowedTypes = new Set(['roulette', 'pig', 'baseball', 'combo']);
+    const legacyTypes = new Set(['roulette', 'pig', 'combo']);
     const normalized = [];
     for (const item of raw) {
       if (!item || typeof item !== 'object') continue;
-      if (!allowedTypes.has(item.type)) continue;
-      if (!Number.isFinite(item.value) || item.value < 0 || item.value > 1) continue;
-      if (typeof item.id !== 'string' || typeof item.label !== 'string') continue;
-      normalized.push({
-        id: item.id.slice(0, 80),
-        type: item.type,
-        label: item.label.slice(0, 100),
-        value: item.value,
-        detail: typeof item.detail === 'string' ? item.detail.slice(0, 300) : '',
-        ts: typeof item.ts === 'string' ? item.ts.slice(0, 40) : '',
-      });
+      if (typeof item.id !== 'string') continue;
+      if (item.type === 'snapshot') {
+        const snapshot = normalizeSnapshot(item.snapshot);
+        if (!snapshot || !snapshotHasContent(snapshot)) continue;
+        normalized.push({
+          id: item.id.slice(0, 80),
+          type: 'snapshot',
+          label: typeof item.label === 'string' ? item.label.slice(0, 100) : '集計記録',
+          snapshot,
+          summary: buildSnapshotText(snapshot),
+          ts: typeof item.ts === 'string' ? item.ts.slice(0, 40) : '',
+        });
+      } else if (legacyTypes.has(item.type) && Number.isFinite(item.value) && item.value >= 0 && item.value <= 1 &&
+          typeof item.label === 'string') {
+        normalized.push({
+          id: item.id.slice(0, 80),
+          type: 'legacy',
+          label: item.label.slice(0, 100),
+          value: item.value,
+          detail: typeof item.detail === 'string' ? item.detail.slice(0, 300) : '',
+          ts: typeof item.ts === 'string' ? item.ts.slice(0, 40) : '',
+        });
+      }
       if (normalized.length >= HISTORY_LIMIT) break;
     }
     return normalized;
@@ -638,21 +717,41 @@
       info.className = 'info';
       const top = document.createElement('div');
       top.className = 'top';
-      top.textContent = `${item.label} — ${fmt(item.value)}`;
+      top.textContent = item.type === 'snapshot' ? `${item.label} — ${item.ts}` : `${item.label} — ${fmt(item.value)}`;
       const bottom = document.createElement('div');
       bottom.className = 'bottom';
-      bottom.textContent = `${item.detail} ・ ${item.ts}`;
+      bottom.textContent = item.type === 'snapshot' ? item.summary : `${item.detail} ・ ${item.ts}（旧形式・反映不可）`;
       info.append(top, bottom);
+
+      const actions = document.createElement('div');
+      actions.className = 'history-actions';
+      if (item.type === 'snapshot') {
+        const restoreButton = document.createElement('button');
+        restoreButton.type = 'button';
+        restoreButton.className = 'restore';
+        restoreButton.textContent = 'この状態を反映';
+        restoreButton.addEventListener('click', () => restoreSnapshot(item));
+
+        const copyButton = document.createElement('button');
+        copyButton.type = 'button';
+        copyButton.textContent = 'コピー';
+        copyButton.addEventListener('click', async () => {
+          const copied = await copyToClipboard(item.summary);
+          announce(copied ? '保存した結果をコピーしました。' : 'コピーできませんでした。');
+        });
+        actions.append(restoreButton, copyButton);
+      }
 
       const deleteButton = document.createElement('button');
       deleteButton.type = 'button';
-      deleteButton.className = 'del';
+      deleteButton.className = 'delete';
       deleteButton.dataset.id = item.id;
-      deleteButton.textContent = '✕';
+      deleteButton.textContent = '削除';
       deleteButton.setAttribute('aria-label', `${item.label}の履歴を削除`);
       deleteButton.addEventListener('click', () => deleteRecord(item.id));
+      actions.appendChild(deleteButton);
 
-      row.append(dot, info, deleteButton);
+      row.append(dot, info, actions);
       historyList.appendChild(row);
     }
   }
@@ -674,13 +773,15 @@
     return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
-  function addRecord(type, label, value, detail) {
+  function addSnapshotRecord() {
+    const snapshot = normalizeSnapshot(captureSnapshot());
+    if (!snapshot || !snapshotHasContent(snapshot)) return null;
     const record = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      type,
-      label,
-      value,
-      detail,
+      type: 'snapshot',
+      label: 'ルーレット・豚の集計',
+      snapshot,
+      summary: buildSnapshotText(snapshot),
       ts: nowStr(),
     };
     const nextHistory = [record, ...historyData].slice(0, HISTORY_LIMIT);
@@ -688,6 +789,73 @@
     historyData = nextHistory;
     renderHistory();
     return record.id;
+  }
+
+  function clearRestoreOffer() {
+    restoreToast?.remove();
+    restoreToast = null;
+    restoreBackup = null;
+  }
+
+  function applySnapshot(snapshot) {
+    rSuccess.value = snapshot.rSuccess;
+    rTotal.value = snapshot.rTotal;
+    pSuccess.value = snapshot.pSuccess;
+    pTotal.value = snapshot.pTotal;
+    pRefundCount = snapshot.pRefundCount;
+    pRefund4000Count = snapshot.pRefund4000Count;
+    pRefund3500Count = snapshot.pRefund3500Count;
+    pRefund3000Count = snapshot.pRefund3000Count;
+    pRefund2500Count = snapshot.pRefund2500Count;
+    pRefund2000Count = snapshot.pRefund2000Count;
+    clearQuickUndo();
+    renderRefundCount();
+    updateRoulette();
+    updatePig(true);
+    saveInputs();
+  }
+
+  function showRestoreOffer() {
+    restoreToast = document.createElement('div');
+    restoreToast.className = 'stepper-toast';
+    const message = document.createElement('span');
+    message.className = 'stepper-toast-message';
+    message.textContent = '保存した集計を反映しました。';
+    const undoButton = document.createElement('button');
+    undoButton.type = 'button';
+    undoButton.className = 'stepper-toast-dismiss';
+    undoButton.textContent = '反映前に戻す';
+    undoButton.addEventListener('click', () => {
+      if (!restoreBackup) return;
+      const backup = restoreBackup;
+      applyingSnapshot = true;
+      applySnapshot(backup);
+      applyingSnapshot = false;
+      clearRestoreOffer();
+      announce('反映前の状態へ戻しました。');
+    });
+    const dismissButton = document.createElement('button');
+    dismissButton.type = 'button';
+    dismissButton.className = 'stepper-toast-dismiss';
+    dismissButton.textContent = '閉じる';
+    dismissButton.addEventListener('click', clearRestoreOffer);
+    restoreToast.append(message, undoButton, dismissButton);
+    stepperToastStack.prepend(restoreToast);
+  }
+
+  function restoreSnapshot(item) {
+    const snapshot = normalizeSnapshot(item.snapshot);
+    if (!snapshot) {
+      announce('この記録は反映できません。');
+      return;
+    }
+    clearRestoreOffer();
+    restoreBackup = normalizeSnapshot(captureSnapshot());
+    applyingSnapshot = true;
+    applySnapshot(snapshot);
+    applyingSnapshot = false;
+    showRestoreOffer();
+    announce('保存した集計を反映しました。');
   }
 
   function deleteRecord(id) {
@@ -707,7 +875,7 @@
   function openHistoryAndHighlight(id) {
     setHistoryOpen(true);
     window.requestAnimationFrame(() => {
-      const button = [...historyList.querySelectorAll('.del')]
+      const button = [...historyList.querySelectorAll('.delete')]
         .find((candidate) => candidate.dataset.id === id);
       const row = button ? button.closest('.history-item') : null;
       if (row) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -770,8 +938,6 @@
     'r-success': 'ルーレット成功回数',
     'p-total': '豚の試行回数',
     'p-success': '豚の成功回数',
-    'b-total': '野球の試行回数',
-    'b-success': '野球の成功回数',
     'p-refund': '4500還元人数',
     'p-refund-4000': '4000還元人数',
     'p-refund-3000': '3000還元人数',
@@ -933,7 +1099,7 @@
   }
 
   resetExecute.addEventListener('click', async () => {
-    const inputs = [rSuccess, rTotal, pSuccess, pTotal, bSuccess, bTotal];
+    const inputs = [rSuccess, rTotal, pSuccess, pTotal];
     setResetConfirmation(false, true);
     inputs.forEach((input) => { input.value = ''; });
     pRefundCount = 0;
@@ -945,7 +1111,6 @@
     renderRefundCount();
     updateRoulette();
     updatePig();
-    updateBaseball();
     saveInputs();
     const cacheResult = await clearAppCaches();
     if (cacheResult.supported) {
@@ -960,41 +1125,15 @@
     setResetConfirmation(false, true);
   });
 
-  rSaveBtn.addEventListener('click', () => {
-    if (!rData || rRate === null) return;
-    const id = addRecord('roulette', '🎯 ルーレット成功率', rRate, `成功${rData.success} / 試行${rData.total}`);
+  snapshotSaveBtn.addEventListener('click', () => {
+    const id = addSnapshotRecord();
     if (!id) return;
-    flashSaved(rSaveBtn);
-    openHistoryAndHighlight(id);
-  });
-
-  pSaveBtn.addEventListener('click', () => {
-    if (!pData || pRate === null) return;
-    const id = addRecord('pig', '🐷 豚成功率', pRate, `成功${pData.success} / 試行${pData.total}`);
-    if (!id) return;
-    flashSaved(pSaveBtn);
-    openHistoryAndHighlight(id);
-  });
-
-  bSaveBtn.addEventListener('click', () => {
-    if (!bData || bRate === null) return;
-    const id = addRecord('baseball', '⚾️ 野球成功率', bRate, `成功${bData.success} / 試行${bData.total}`);
-    if (!id) return;
-    flashSaved(bSaveBtn);
-    openHistoryAndHighlight(id);
-  });
-
-  cSaveBtn.addEventListener('click', () => {
-    if (comboValue === null) return;
-    const id = addRecord('combo', `➕ ${comboLabel.textContent}`, comboValue, comboDetail);
-    if (!id) return;
-    flashSaved(cSaveBtn);
+    flashSaved(snapshotSaveBtn);
     openHistoryAndHighlight(id);
   });
 
   rCopyBtn.addEventListener('click', () => handleCopy(rCopyText, rCopyBtn));
   pCopyBtn.addEventListener('click', () => handleCopy(pCopyText, pCopyBtn));
-  bCopyBtn.addEventListener('click', () => handleCopy(bCopyText, bCopyBtn));
   cCopyBtn.addEventListener('click', () => handleCopy(cCopyText, cCopyBtn));
   twoCopyBtn.addEventListener('click', () => handleCopy(twoCopyText, twoCopyBtn));
   allCopyBtn.addEventListener('click', () => handleCopy(allCopyText, allCopyBtn));
@@ -1013,14 +1152,6 @@
       saveInputs();
     });
   });
-  [bSuccess, bTotal].forEach((input) => {
-    input.addEventListener('input', () => {
-      if (resetConfirmationIsOpen()) setResetConfirmation(false);
-      updateBaseball();
-      saveInputs();
-    });
-  });
-
   let audioCtx = null;
   let soundType = 'click';
   let muted = false;
@@ -1307,7 +1438,6 @@
   loadSettings();
   updateRoulette();
   updatePig(true);
-  updateBaseball();
   loadHistory();
 
   if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
