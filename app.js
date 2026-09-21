@@ -101,6 +101,7 @@
   const stepperToastStack = byId('stepper-toast-stack');
   const toastDurationInput = byId('toast-duration');
   const importText = byId('import-text');
+  const importCard = byId('import-card');
   const importReadBtn = byId('import-read');
   const importError = byId('import-error');
   const importPreview = byId('import-preview');
@@ -148,6 +149,7 @@
     mainContent.insertBefore(card, snapshotSaveBtn.parentElement);
   });
   mainContent.insertBefore(settingsBar, resetArea);
+  mainContent.insertBefore(importCard, statusMessage);
 
   function announce(message) {
     window.clearTimeout(statusTimer);
