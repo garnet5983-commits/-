@@ -1069,39 +1069,6 @@
       </div>
     </section>
 
-    <section class="card baseball" aria-labelledby="baseball-heading">
-      <h2 id="baseball-heading">⚾️ 野球成功率</h2>
-      <div class="row">
-        <div class="field">
-          <label for="b-total">試行回数</label>
-          <input type="number" id="b-total" inputmode="numeric" min="1" max="9007199254740991" step="1" placeholder="0" autocomplete="off" aria-describedby="b-error">
-          <div class="stepper-row">
-            <button type="button" class="stepper-btn" data-target="b-total" data-op="minus" aria-label="野球の試行回数を減らす">−</button>
-            <input type="number" id="b-total-delta" inputmode="numeric" min="1" max="9007199254740991" step="1" value="1" aria-label="野球の試行回数の増減幅">
-            <button type="button" class="stepper-btn" data-target="b-total" data-op="plus" aria-label="野球の試行回数を増やす">＋</button>
-          </div>
-        </div>
-        <div class="field">
-          <label for="b-success">成功回数</label>
-          <input type="number" id="b-success" inputmode="numeric" min="0" max="9007199254740991" step="1" placeholder="0" autocomplete="off" aria-describedby="b-error">
-          <div class="stepper-row">
-            <button type="button" class="stepper-btn" data-target="b-success" data-op="minus" aria-label="野球の成功回数を減らす">−</button>
-            <input type="number" id="b-success-delta" inputmode="numeric" min="1" max="9007199254740991" step="1" value="1" aria-label="野球の成功回数の増減幅">
-            <button type="button" class="stepper-btn" data-target="b-success" data-op="plus" aria-label="野球の成功回数を増やす">＋</button>
-          </div>
-        </div>
-      </div>
-      <div class="validation-message" id="b-error" aria-live="polite"></div>
-      <div class="result" role="status" aria-live="polite" aria-atomic="true">
-        <span class="label">成功率</span>
-        <span class="value" id="b-result">—</span>
-      </div>
-      <div class="copy-row">
-        <input type="text" class="copy-input" id="b-copy-text" aria-label="野球成功率のコピー用テキスト" readonly value="—">
-        <button type="button" class="copy-btn" id="b-copy-btn" disabled>コピー</button>
-      </div>
-    </section>
-
     <section class="card combo" aria-labelledby="combo-heading">
       <h2 id="combo-heading">➕ 合算成功率</h2>
       <div class="result" role="status" aria-live="polite" aria-atomic="true">
@@ -1133,13 +1100,46 @@
       </div>
 
       <div class="combo-all">
-        <div class="combo-all-label">📋 ルーレット・豚・野球・合算 まとめてコピペ</div>
-        <textarea class="combo-all-textarea" id="all-copy-text" aria-label="ルーレット・豚・野球・合算のコピー用テキスト" rows="5" readonly>—</textarea>
+        <div class="combo-all-label">📋 ルーレット・豚・合算＋野球 まとめてコピペ</div>
+        <textarea class="combo-all-textarea" id="all-copy-text" aria-label="ルーレット・豚・合算と野球のコピー用テキスト" rows="5" readonly>—</textarea>
         <div class="combo-all-copy-row">
           <button type="button" class="copy-btn" id="all-copy-btn" disabled>合算込みでコピー</button>
         </div>
       </div>
 
+    </section>
+
+    <section class="card baseball" aria-labelledby="baseball-heading">
+      <h2 id="baseball-heading">⚾️ 野球成功率（たまに使う枠）</h2>
+      <div class="row">
+        <div class="field">
+          <label for="b-total">試行回数</label>
+          <input type="number" id="b-total" inputmode="numeric" min="1" max="9007199254740991" step="1" placeholder="0" autocomplete="off" aria-describedby="b-error">
+          <div class="stepper-row">
+            <button type="button" class="stepper-btn" data-target="b-total" data-op="minus" aria-label="野球の試行回数を減らす">−</button>
+            <input type="number" id="b-total-delta" inputmode="numeric" min="1" max="9007199254740991" step="1" value="1" aria-label="野球の試行回数の増減幅">
+            <button type="button" class="stepper-btn" data-target="b-total" data-op="plus" aria-label="野球の試行回数を増やす">＋</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="b-success">成功回数</label>
+          <input type="number" id="b-success" inputmode="numeric" min="0" max="9007199254740991" step="1" placeholder="0" autocomplete="off" aria-describedby="b-error">
+          <div class="stepper-row">
+            <button type="button" class="stepper-btn" data-target="b-success" data-op="minus" aria-label="野球の成功回数を減らす">−</button>
+            <input type="number" id="b-success-delta" inputmode="numeric" min="1" max="9007199254740991" step="1" value="1" aria-label="野球の成功回数の増減幅">
+            <button type="button" class="stepper-btn" data-target="b-success" data-op="plus" aria-label="野球の成功回数を増やす">＋</button>
+          </div>
+        </div>
+      </div>
+      <div class="validation-message" id="b-error" aria-live="polite"></div>
+      <div class="result" role="status" aria-live="polite" aria-atomic="true">
+        <span class="label">成功率</span>
+        <span class="value" id="b-result">—</span>
+      </div>
+      <div class="copy-row">
+        <input type="text" class="copy-input" id="b-copy-text" aria-label="野球成功率のコピー用テキスト" readonly value="—">
+        <button type="button" class="copy-btn" id="b-copy-btn" disabled>コピー</button>
+      </div>
     </section>
 
     <div class="snapshot-save-area">

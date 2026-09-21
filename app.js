@@ -295,7 +295,7 @@
     const bText = buildBaseballText();
     const cText = buildComboText();
 
-    if (rText && pText) {
+    if (pText) {
       const combined = [rText, pText, bText].filter(Boolean).join('\n');
       twoCopyText.value = combined;
       twoCopyText.dataset.text = combined;
@@ -307,7 +307,7 @@
     }
 
     if (rText && pText && cText) {
-      const combined = [rText, pText, bText, `合算：${cText}`].filter(Boolean).join('\n');
+      const combined = [rText, pText, `合算：${cText}`, bText].filter(Boolean).join('\n');
       allCopyText.value = combined;
       allCopyText.dataset.text = combined;
       allCopyBtn.disabled = false;
@@ -431,7 +431,6 @@
       ].filter(([, count]) => count > 0).map(([amount, count]) => `${amount}🐷${count}回`);
       if (refunds.length) lines.push(refunds.join('　'));
     }
-    if (baseball) lines.push(baseball);
     const rSuccessState = parseCount(snapshot.rSuccess);
     const rTotalState = parseCount(snapshot.rTotal);
     const pSuccessState = parseCount(snapshot.pSuccess);
@@ -441,6 +440,7 @@
       const totalTrials = rTotalState.value + pTotalState.value;
       lines.push(`合算：${totalTrials}回中${totalSuccess}回⭕️${fmt(totalSuccess / totalTrials)}`);
     }
+    if (baseball) lines.push(baseball);
     if (!lines.length) {
       const refunds = [
         [2000, snapshot.pRefund2000Count], [2500, snapshot.pRefund2500Count],
