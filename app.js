@@ -61,6 +61,13 @@
   const pRefund2000MinusBtn = byId('p-refund-2000-minus');
   const pRefund2000PlusBtn = byId('p-refund-2000-plus');
 
+  const bSuccess = byId('b-success');
+  const bTotal = byId('b-total');
+  const bError = byId('b-error');
+  const bResult = byId('b-result');
+  const bCopyText = byId('b-copy-text');
+  const bCopyBtn = byId('b-copy-btn');
+
   const comboResult = byId('combo-result');
   const comboLabel = byId('combo-label');
   const comboNote = byId('combo-note');
@@ -89,8 +96,10 @@
 
   let rData = null;
   let pData = null;
+  let bData = null;
   let rRate = null;
   let pRate = null;
+  let bRate = null;
   let pRefundCount = 0;
   let pRefund4000Count = 0;
   let pRefund3000Count = 0;
@@ -264,6 +273,11 @@
     return `豚${pData.total}回中${pData.success}回⭕️${fmt(pRate)}${refundText}`;
   }
 
+  function buildBaseballText() {
+    if (!bData || bRate === null) return null;
+    return `⚾️${bData.total}回中${bData.success}回⭕️${fmt(bRate)}`;
+  }
+
   function buildComboText() {
     if (comboValue === null) return null;
     return comboCounts ? `${comboCounts.total}回中${comboCounts.success}回⭕️${fmt(comboValue)}` : null;
@@ -278,10 +292,11 @@
   function updateAllCopyText() {
     const rText = buildRouletteText();
     const pText = buildPigText();
+    const bText = buildBaseballText();
     const cText = buildComboText();
 
     if (rText && pText) {
-      const combined = [rText, pText].join('\n');
+      const combined = [rText, pText, bText].filter(Boolean).join('\n');
       twoCopyText.value = combined;
       twoCopyText.dataset.text = combined;
       twoCopyBtn.disabled = false;
@@ -292,7 +307,7 @@
     }
 
     if (rText && pText && cText) {
-      const combined = [rText, pText, `合算：${cText}`].join('\n');
+      const combined = [rText, pText, bText, `合算：${cText}`].filter(Boolean).join('\n');
       allCopyText.value = combined;
       allCopyText.dataset.text = combined;
       allCopyBtn.disabled = false;
@@ -332,12 +347,23 @@
     updateCombo();
   }
 
+  function updateBaseball() {
+    bData = validatePair(bSuccess, bTotal, bError);
+    bRate = bData ? bData.success / bData.total : null;
+    bResult.textContent = fmt(bRate);
+    setCopyOutput(bCopyText, bCopyBtn, buildBaseballText());
+    updateAllCopyText();
+    updateSnapshotSaveButton();
+  }
+
   function captureSnapshot() {
     return {
       rSuccess: rSuccess.value,
       rTotal: rTotal.value,
       pSuccess: pSuccess.value,
       pTotal: pTotal.value,
+      bSuccess: bSuccess.value,
+      bTotal: bTotal.value,
       pRefundCount,
       pRefund4000Count,
       pRefund3500Count,
@@ -359,6 +385,8 @@
       rTotal: normalizeSnapshotCount(raw.rTotal),
       pSuccess: normalizeSnapshotCount(raw.pSuccess),
       pTotal: normalizeSnapshotCount(raw.pTotal),
+      bSuccess: normalizeSnapshotCount(raw.bSuccess),
+      bTotal: normalizeSnapshotCount(raw.bTotal),
     };
     if (Object.values(snapshot).some((value) => value === null)) return null;
     for (const key of ['pRefundCount', 'pRefund4000Count', 'pRefund3500Count', 'pRefund3000Count', 'pRefund2500Count', 'pRefund2000Count']) {
@@ -366,7 +394,7 @@
       if (!parsed.ok) return null;
       snapshot[key] = parsed.value;
     }
-    for (const prefix of ['r', 'p']) {
+    for (const prefix of ['r', 'p', 'b']) {
       const success = parseCount(snapshot[`${prefix}Success`]);
       const total = parseCount(snapshot[`${prefix}Total`]);
       const empty = success.empty && total.empty;
@@ -376,7 +404,7 @@
   }
 
   function snapshotHasContent(snapshot) {
-    return Boolean(snapshot.rSuccess || snapshot.rTotal || snapshot.pSuccess || snapshot.pTotal ||
+    return Boolean(snapshot.rSuccess || snapshot.rTotal || snapshot.pSuccess || snapshot.pTotal || snapshot.bSuccess || snapshot.bTotal ||
       snapshot.pRefundCount || snapshot.pRefund4000Count || snapshot.pRefund3500Count ||
       snapshot.pRefund3000Count || snapshot.pRefund2500Count || snapshot.pRefund2000Count);
   }
@@ -392,6 +420,7 @@
     const lines = [];
     const roulette = snapshotPairText('ルレ', snapshot.rSuccess, snapshot.rTotal);
     const pig = snapshotPairText('豚', snapshot.pSuccess, snapshot.pTotal);
+    const baseball = snapshotPairText('⚾️', snapshot.bSuccess, snapshot.bTotal);
     if (roulette) lines.push(roulette);
     if (pig) {
       lines.push(pig);
@@ -402,6 +431,7 @@
       ].filter(([, count]) => count > 0).map(([amount, count]) => `${amount}🐷${count}回`);
       if (refunds.length) lines.push(refunds.join('　'));
     }
+    if (baseball) lines.push(baseball);
     const rSuccessState = parseCount(snapshot.rSuccess);
     const rTotalState = parseCount(snapshot.rTotal);
     const pSuccessState = parseCount(snapshot.pSuccess);
@@ -578,6 +608,8 @@
       rTotal: rTotal.value,
       pSuccess: pSuccess.value,
       pTotal: pTotal.value,
+      bSuccess: bSuccess.value,
+      bTotal: bTotal.value,
       pRefundCount,
       pRefund4000Count,
       pRefund3000Count,
@@ -629,6 +661,8 @@
     rTotal.value = normalizeStoredCount(data.rTotal);
     pSuccess.value = normalizeStoredCount(data.pSuccess);
     pTotal.value = normalizeStoredCount(data.pTotal);
+    bSuccess.value = normalizeStoredCount(data.bSuccess);
+    bTotal.value = normalizeStoredCount(data.bTotal);
     const refundState = parseCount(String(data.pRefundCount ?? 0));
     pRefundCount = refundState.ok ? refundState.value : 0;
     const refund4000State = parseCount(String(data.pRefund4000Count ?? 0));
@@ -650,7 +684,7 @@
 
   function normalizeHistory(raw) {
     if (!Array.isArray(raw)) return [];
-    const legacyTypes = new Set(['roulette', 'pig', 'combo']);
+    const legacyTypes = new Set(['roulette', 'pig', 'baseball', 'combo']);
     const normalized = [];
     for (const item of raw) {
       if (!item || typeof item !== 'object') continue;
@@ -779,7 +813,7 @@
     const record = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       type: 'snapshot',
-      label: 'ルーレット・豚の集計',
+      label: 'ルーレット・豚・野球の集計',
       snapshot,
       summary: buildSnapshotText(snapshot),
       ts: nowStr(),
@@ -802,6 +836,8 @@
     rTotal.value = snapshot.rTotal;
     pSuccess.value = snapshot.pSuccess;
     pTotal.value = snapshot.pTotal;
+    bSuccess.value = snapshot.bSuccess;
+    bTotal.value = snapshot.bTotal;
     pRefundCount = snapshot.pRefundCount;
     pRefund4000Count = snapshot.pRefund4000Count;
     pRefund3500Count = snapshot.pRefund3500Count;
@@ -812,6 +848,7 @@
     renderRefundCount();
     updateRoulette();
     updatePig(true);
+    updateBaseball();
     saveInputs();
   }
 
@@ -938,6 +975,8 @@
     'r-success': 'ルーレット成功回数',
     'p-total': '豚の試行回数',
     'p-success': '豚の成功回数',
+    'b-total': '野球の試行回数',
+    'b-success': '野球の成功回数',
     'p-refund': '4500還元人数',
     'p-refund-4000': '4000還元人数',
     'p-refund-3000': '3000還元人数',
@@ -1099,7 +1138,7 @@
   }
 
   resetExecute.addEventListener('click', async () => {
-    const inputs = [rSuccess, rTotal, pSuccess, pTotal];
+    const inputs = [rSuccess, rTotal, pSuccess, pTotal, bSuccess, bTotal];
     setResetConfirmation(false, true);
     inputs.forEach((input) => { input.value = ''; });
     pRefundCount = 0;
@@ -1111,6 +1150,7 @@
     renderRefundCount();
     updateRoulette();
     updatePig();
+    updateBaseball();
     saveInputs();
     const cacheResult = await clearAppCaches();
     if (cacheResult.supported) {
@@ -1134,6 +1174,7 @@
 
   rCopyBtn.addEventListener('click', () => handleCopy(rCopyText, rCopyBtn));
   pCopyBtn.addEventListener('click', () => handleCopy(pCopyText, pCopyBtn));
+  bCopyBtn.addEventListener('click', () => handleCopy(bCopyText, bCopyBtn));
   cCopyBtn.addEventListener('click', () => handleCopy(cCopyText, cCopyBtn));
   twoCopyBtn.addEventListener('click', () => handleCopy(twoCopyText, twoCopyBtn));
   allCopyBtn.addEventListener('click', () => handleCopy(allCopyText, allCopyBtn));
@@ -1149,6 +1190,13 @@
     input.addEventListener('input', () => {
       if (resetConfirmationIsOpen()) setResetConfirmation(false);
       updatePig();
+      saveInputs();
+    });
+  });
+  [bSuccess, bTotal].forEach((input) => {
+    input.addEventListener('input', () => {
+      if (resetConfirmationIsOpen()) setResetConfirmation(false);
+      updateBaseball();
       saveInputs();
     });
   });
@@ -1438,6 +1486,7 @@
   loadSettings();
   updateRoulette();
   updatePig(true);
+  updateBaseball();
   loadHistory();
 
   if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
