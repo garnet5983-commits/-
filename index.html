@@ -287,8 +287,17 @@
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    margin-top: 22px;
     margin-bottom: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--panel-edge);
     flex-wrap: wrap;
+  }
+  .settings-heading {
+    width: 100%;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 800;
   }
   .settings-group {
     display: flex;
@@ -897,7 +906,8 @@
   </header>
 
   <main id="main-content" tabindex="-1">
-    <div class="settings-bar" aria-label="サウンド設定">
+    <div class="settings-bar" id="settings-bar" aria-label="サウンドと通知の設定">
+      <div class="settings-heading">⚙️ 操作設定</div>
       <div class="settings-group">
         <span class="settings-label">タップ音</span>
         <div class="sound-options" role="group" aria-label="タップ音の種類">
@@ -919,7 +929,7 @@
       </label>
     </div>
 
-    <section class="card roulette" aria-labelledby="roulette-heading">
+    <section class="card roulette" id="roulette-card" aria-labelledby="roulette-heading">
       <h2 id="roulette-heading">🎯 ルーレット成功率</h2>
       <div class="row">
         <div class="field">
@@ -952,7 +962,7 @@
       </div>
     </section>
 
-    <section class="card pig" aria-labelledby="pig-heading">
+    <section class="card pig" id="pig-card" aria-labelledby="pig-heading">
       <h2 id="pig-heading">🐷 豚成功率</h2>
       <div class="pig-quick" aria-label="豚の結果を1回で記録">
         <div class="pig-quick-title">結果を1回で記録</div>
@@ -1069,7 +1079,7 @@
       </div>
     </section>
 
-    <section class="card combo" aria-labelledby="combo-heading">
+    <section class="card combo" id="combo-card" aria-labelledby="combo-heading">
       <h2 id="combo-heading">➕ 合算成功率</h2>
       <div class="result" role="status" aria-live="polite" aria-atomic="true">
         <span class="label" id="combo-label">合計成功回数 ÷ 合計試行回数</span>
@@ -1109,7 +1119,7 @@
 
     </section>
 
-    <section class="card baseball" aria-labelledby="baseball-heading">
+    <section class="card baseball" id="baseball-card" aria-labelledby="baseball-heading">
       <h2 id="baseball-heading">⚾️ 野球成功率（たまに使う枠）</h2>
       <div class="row">
         <div class="field">
@@ -1152,7 +1162,7 @@
       <div id="history-list"></div>
       <button type="button" class="history-clear" id="history-clear" style="display:none;">すべて削除する</button>
     </div>
-    <div class="reset-area">
+    <div class="reset-area" id="reset-area">
       <button type="button" class="reset-toggle" id="reset-toggle" aria-expanded="false" aria-controls="reset-confirm">↺ 数値・キャッシュを一括消去</button>
       <div class="reset-confirm" id="reset-confirm" role="group" aria-labelledby="reset-confirm-title" hidden>
         <p id="reset-confirm-title">

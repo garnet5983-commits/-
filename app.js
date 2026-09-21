@@ -86,6 +86,13 @@
   const historyList = byId('history-list');
   const historyClear = byId('history-clear');
   const snapshotSaveBtn = byId('snapshot-save');
+  const mainContent = byId('main-content');
+  const pigCard = byId('pig-card');
+  const rouletteCard = byId('roulette-card');
+  const baseballCard = byId('baseball-card');
+  const comboCard = byId('combo-card');
+  const settingsBar = byId('settings-bar');
+  const resetArea = byId('reset-area');
   const resetToggle = byId('reset-toggle');
   const resetConfirm = byId('reset-confirm');
   const resetCancel = byId('reset-cancel');
@@ -127,6 +134,12 @@
   const stepperSummaries = new Map();
   let nonCriticalStorageWarningShown = false;
   const feedbackTimers = new WeakMap();
+
+  // 使用頻度の高い順に並べ、各種設定は集計欄の下へまとめる。
+  [pigCard, rouletteCard, baseballCard, comboCard].forEach((card) => {
+    mainContent.insertBefore(card, snapshotSaveBtn.parentElement);
+  });
+  mainContent.insertBefore(settingsBar, resetArea);
 
   function announce(message) {
     window.clearTimeout(statusTimer);
@@ -210,11 +223,16 @@
   }
 
   function validatePair(successInput, totalInput, errorElement) {
-    const successState = parseCount(successInput.value);
+    let successState = parseCount(successInput.value);
     const totalState = parseCount(totalInput.value);
     let message = '';
     let successInvalid = false;
     let totalInvalid = false;
+
+    if (successState.empty && totalState.ok && totalState.value >= 1) {
+      successInput.value = '0';
+      successState = { ok: true, value: 0 };
+    }
 
     if (totalState.ok) {
       successInput.max = String(totalState.value);
