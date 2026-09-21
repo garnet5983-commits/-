@@ -278,6 +278,13 @@
     return `⚾️${bData.total}回中${bData.success}回⭕️${fmt(bRate)}`;
   }
 
+  function buildPigAndBaseballText() {
+    const pigText = buildPigText();
+    if (!pigText) return null;
+    const baseballText = buildBaseballText();
+    return [pigText, baseballText].filter(Boolean).join('\n');
+  }
+
   function buildComboText() {
     if (comboValue === null) return null;
     return comboCounts ? `${comboCounts.total}回中${comboCounts.success}回⭕️${fmt(comboValue)}` : null;
@@ -343,7 +350,7 @@
     pData = validatePair(pSuccess, pTotal, pError);
     pRate = pData ? pData.success / pData.total : null;
     pResult.textContent = fmt(pRate);
-    setCopyOutput(pCopyText, pCopyBtn, buildPigText());
+    setCopyOutput(pCopyText, pCopyBtn, buildPigAndBaseballText());
     updateCombo();
   }
 
@@ -352,6 +359,7 @@
     bRate = bData ? bData.success / bData.total : null;
     bResult.textContent = fmt(bRate);
     setCopyOutput(bCopyText, bCopyBtn, buildBaseballText());
+    setCopyOutput(pCopyText, pCopyBtn, buildPigAndBaseballText());
     updateAllCopyText();
     updateSnapshotSaveButton();
   }
