@@ -45,6 +45,19 @@
     min-height: 100dvh;
   }
   .wrap { max-width: 480px; margin: 0 auto; }
+  #main-content { display: flex; flex-direction: column; }
+  #pig-card { order: 10; }
+  #roulette-card { order: 20; }
+  #baseball-card { order: 30; }
+  #combo-card { order: 40; }
+  #main-content > .snapshot-save-area { order: 50; }
+  #history-toggle { order: 60; }
+  #history-panel { order: 61; }
+  #settings-bar { order: 70; }
+  #reset-area { order: 80; }
+  #import-card { order: 90; }
+  #status-message { order: 100; }
+  #stepper-toast-stack { order: 101; }
 
   .skip-link {
     position: fixed;
