@@ -100,6 +100,13 @@
   const statusMessage = byId('status-message');
   const stepperToastStack = byId('stepper-toast-stack');
   const toastDurationInput = byId('toast-duration');
+  const importText = byId('import-text');
+  const importReadBtn = byId('import-read');
+  const importError = byId('import-error');
+  const importPreview = byId('import-preview');
+  const importSummary = byId('import-summary');
+  const importCancelBtn = byId('import-cancel');
+  const importApplyBtn = byId('import-apply');
 
   let rData = null;
   let pData = null;
@@ -131,6 +138,7 @@
   let restoreBackup = null;
   let restoreToast = null;
   let applyingSnapshot = false;
+  let pendingImportSnapshot = null;
   const stepperSummaries = new Map();
   let nonCriticalStorageWarningShown = false;
   const feedbackTimers = new WeakMap();
@@ -481,6 +489,100 @@
   function updateSnapshotSaveButton() {
     const snapshot = normalizeSnapshot(captureSnapshot());
     setButtonAvailable(snapshotSaveBtn, Boolean(snapshot && snapshotHasContent(snapshot)));
+  }
+
+  function emptySnapshot() {
+    return {
+      rSuccess: '', rTotal: '', pSuccess: '', pTotal: '', bSuccess: '', bTotal: '',
+      pRefundCount: 0, pRefund4000Count: 0, pRefund3500Count: 0,
+      pRefund3000Count: 0, pRefund2500Count: 0, pRefund2000Count: 0,
+    };
+  }
+
+  function safeCurrentSnapshot() {
+    const raw = captureSnapshot();
+    const snapshot = emptySnapshot();
+    for (const key of ['pRefundCount', 'pRefund4000Count', 'pRefund3500Count', 'pRefund3000Count', 'pRefund2500Count', 'pRefund2000Count']) {
+      snapshot[key] = Number.isSafeInteger(raw[key]) && raw[key] >= 0 ? raw[key] : 0;
+    }
+    for (const prefix of ['r', 'p', 'b']) {
+      const success = parseCount(raw[`${prefix}Success`]);
+      const total = parseCount(raw[`${prefix}Total`]);
+      if (success.ok && total.ok && total.value >= 1 && success.value <= total.value) {
+        snapshot[`${prefix}Success`] = String(success.value);
+        snapshot[`${prefix}Total`] = String(total.value);
+      }
+    }
+    return snapshot;
+  }
+
+  function parseImportedPair(text, pattern, label) {
+    const match = text.match(pattern);
+    if (!match) return { found: false };
+    const total = parseCount(match[1]);
+    const success = parseCount(match[2]);
+    if (!total.ok || !success.ok || total.value < 1 || success.value > total.value) {
+      return { found: true, error: `${label}の試行回数・成功回数が正しくありません。` };
+    }
+    return { found: true, total: String(total.value), success: String(success.value) };
+  }
+
+  function parseImportedText(text) {
+    const current = safeCurrentSnapshot();
+    const next = { ...current };
+    const pairs = [
+      ['r', 'ルーレット', /ルレ\s*(\d+)\s*回中\s*(\d+)\s*回/u],
+      ['p', '豚', /豚\s*(\d+)\s*回中\s*(\d+)\s*回/u],
+      ['b', '野球', /⚾(?:️)?\s*(\d+)\s*回中\s*(\d+)\s*回/u],
+    ];
+    let found = 0;
+    let pigFound = false;
+    for (const [prefix, label, pattern] of pairs) {
+      const parsed = parseImportedPair(text, pattern, label);
+      if (parsed.error) return { error: parsed.error };
+      if (!parsed.found) continue;
+      next[`${prefix}Total`] = parsed.total;
+      next[`${prefix}Success`] = parsed.success;
+      if (prefix === 'p') pigFound = true;
+      found += 1;
+    }
+
+    const refundValues = new Map();
+    for (const match of text.matchAll(/(2000|2500|3000|3500|4000|4500)\s*🐷\s*(\d+)\s*回/gu)) {
+      refundValues.set(Number(match[1]), match[2]);
+    }
+    for (const match of text.matchAll(/🐷\s*(2000|2500|3000|3500|4000|4500)\s*還元\s*(\d+)/gu)) {
+      refundValues.set(Number(match[1]), match[2]);
+    }
+    if (pigFound || refundValues.size > 0) {
+      next.pRefundCount = 0;
+      next.pRefund4000Count = 0;
+      next.pRefund3500Count = 0;
+      next.pRefund3000Count = 0;
+      next.pRefund2500Count = 0;
+      next.pRefund2000Count = 0;
+    }
+    const refundKeys = {
+      2000: 'pRefund2000Count', 2500: 'pRefund2500Count', 3000: 'pRefund3000Count',
+      3500: 'pRefund3500Count', 4000: 'pRefund4000Count', 4500: 'pRefundCount',
+    };
+    for (const [amount, rawCount] of refundValues) {
+      const parsed = parseCount(rawCount);
+      if (!parsed.ok) return { error: `${amount}還元の人数が正しくありません。` };
+      next[refundKeys[amount]] = parsed.value;
+      found += 1;
+    }
+    if (found === 0) return { error: 'この計算機の結果を読み取れませんでした。コピーした文章をそのまま貼り付けてください。' };
+    const normalized = normalizeSnapshot(next);
+    if (!normalized) return { error: '読み取った数値を安全に反映できません。内容を確認してください。' };
+    return { snapshot: normalized };
+  }
+
+  function closeImportPreview(clearText = false) {
+    pendingImportSnapshot = null;
+    importPreview.hidden = true;
+    importSummary.textContent = '';
+    if (clearText) importText.value = '';
   }
 
   function recordPigResult(button) {
@@ -878,12 +980,12 @@
     saveInputs();
   }
 
-  function showRestoreOffer() {
+  function showRestoreOffer(messageText = '保存した集計を反映しました。') {
     restoreToast = document.createElement('div');
     restoreToast.className = 'stepper-toast';
     const message = document.createElement('span');
     message.className = 'stepper-toast-message';
-    message.textContent = '保存した集計を反映しました。';
+    message.textContent = messageText;
     const undoButton = document.createElement('button');
     undoButton.type = 'button';
     undoButton.className = 'stepper-toast-dismiss';
@@ -1140,6 +1242,43 @@
     historyData = [];
     renderHistory();
     announce('履歴をすべて削除しました。');
+  });
+
+  importReadBtn.addEventListener('click', () => {
+    importError.textContent = '';
+    closeImportPreview();
+    const parsed = parseImportedText(importText.value);
+    if (parsed.error) {
+      importError.textContent = parsed.error;
+      return;
+    }
+    pendingImportSnapshot = parsed.snapshot;
+    importSummary.textContent = buildSnapshotText(parsed.snapshot);
+    importPreview.hidden = false;
+    importApplyBtn.focus();
+  });
+
+  importText.addEventListener('input', () => {
+    importError.textContent = '';
+    closeImportPreview();
+  });
+
+  importCancelBtn.addEventListener('click', () => {
+    closeImportPreview();
+    announce('コピペの反映をキャンセルしました。');
+  });
+
+  importApplyBtn.addEventListener('click', () => {
+    if (!pendingImportSnapshot) return;
+    const snapshot = pendingImportSnapshot;
+    clearRestoreOffer();
+    restoreBackup = normalizeSnapshot(captureSnapshot()) || emptySnapshot();
+    applyingSnapshot = true;
+    applySnapshot(snapshot);
+    applyingSnapshot = false;
+    closeImportPreview(true);
+    showRestoreOffer('コピペから読み取った集計を反映しました。');
+    announce('コピペから読み取った集計を反映しました。');
   });
 
   resetToggle.addEventListener('click', () => {

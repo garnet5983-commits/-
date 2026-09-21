@@ -318,6 +318,31 @@
     flex: 1;
     min-width: 260px;
   }
+
+  .import-card {
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid #526176;
+    border-radius: 14px;
+    background: #19202a;
+  }
+  .import-card h2 { margin: 0 0 6px; color: #a9c7ef; font-size: 15px; }
+  .import-help { margin: 0 0 10px; color: var(--text-dim); font-size: 11px; line-height: 1.55; }
+  .import-text {
+    width: 100%; min-height: 116px; padding: 11px; resize: vertical;
+    border: 1px solid var(--panel-edge); border-radius: 9px;
+    background: #0f1216; color: var(--text); font: inherit; font-size: 13px; line-height: 1.55;
+  }
+  .import-read { width: 100%; min-height: 46px; margin-top: 9px; border: none; border-radius: 9px; background: #7899c5; color: #10151c; font: inherit; font-weight: 800; cursor: pointer; }
+  .import-error { min-height: 1.4em; margin-top: 7px; color: #ffadad; font-size: 11px; }
+  .import-preview { margin-top: 10px; padding: 12px; border: 1px solid #526176; border-radius: 10px; background: #111820; }
+  .import-preview[hidden] { display: none; }
+  .import-preview strong { display: block; margin-bottom: 7px; color: #a9c7ef; font-size: 12px; }
+  .import-preview pre { margin: 0; white-space: pre-wrap; color: var(--text); font: inherit; font-size: 12px; line-height: 1.55; }
+  .import-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 10px; }
+  .import-actions button { min-height: 44px; border-radius: 8px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+  .import-cancel { border: 1px solid var(--panel-edge); background: transparent; color: var(--text-dim); }
+  .import-apply { border: none; background: #8bb9ad; color: #101512; }
   .sound-btn {
     background: var(--panel);
     border: 1px solid var(--panel-edge);
@@ -906,6 +931,22 @@
   </header>
 
   <main id="main-content" tabindex="-1">
+    <section class="import-card" id="import-card" aria-labelledby="import-heading">
+      <h2 id="import-heading">📥 コピペから集計を引き継ぐ</h2>
+      <p class="import-help">SNSなどに貼られた、この計算機の結果文をそのまま貼り付けてください。読み取れた項目だけを反映します。</p>
+      <textarea class="import-text" id="import-text" aria-label="引き継ぐ結果文" placeholder="例：&#10;ルレ28回中9回⭕️32.14%&#10;豚53回中23回⭕️43.40%&#10;3500🐷2回&#10;⚾️10回中4回⭕️40.00%"></textarea>
+      <button type="button" class="import-read" id="import-read">貼り付け内容を読み取る</button>
+      <div class="import-error" id="import-error" role="alert"></div>
+      <div class="import-preview" id="import-preview" hidden>
+        <strong>反映後の内容を確認してください</strong>
+        <pre id="import-summary"></pre>
+        <div class="import-actions">
+          <button type="button" class="import-cancel" id="import-cancel">キャンセル</button>
+          <button type="button" class="import-apply" id="import-apply">この内容を反映</button>
+        </div>
+      </div>
+    </section>
+
     <div class="settings-bar" id="settings-bar" aria-label="サウンドと通知の設定">
       <div class="settings-heading">⚙️ 操作設定</div>
       <div class="settings-group">
