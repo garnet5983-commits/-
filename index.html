@@ -540,6 +540,9 @@
   .pig-quick .copy-row { flex-direction: column; }
   .pig-quick .copy-row .copy-input { width: 100%; }
   .pig-quick .copy-row .copy-btn { min-height: 48px; width: 100%; font-size: 14px; }
+  .history-transfer { margin-top: 9px; width: 100%; min-height: 48px; border: 1px solid #d9ad2b; border-radius: 9px; background: #27251e; color: #f5d36a; font-size: 14px; font-weight: 700; touch-action: manipulation; }
+  .history-transfer:disabled { opacity: .42; }
+  .history-transfer-help { margin: 6px 0 0; color: var(--text-dim); font-size: 11px; line-height: 1.5; }
 
   .combo-note {
     font-size: 11px;
@@ -1055,7 +1058,7 @@
         </div>
         <details class="record-history" id="pig-record-history">
           <summary id="pig-record-summary">過去の記録を選んで修正（0件）</summary>
-          <p>ワンタップ記録を最大500件まで個別に修正できます。手入力・還元の＋／－操作・集計の反映・一括消去をすると、この一覧はリセットされます。貼り付けた集計の内訳は復元できません。</p>
+          <p>ワンタップ記録を最大500件まで個別に修正できます。「結果＋修正履歴をコピー」で渡した集計なら、別端末でもこの一覧を引き継げます。</p>
           <div id="pig-record-list" class="record-history-list"></div>
           <button type="button" id="pig-record-more" hidden>さらに20件表示</button>
           <section id="pig-record-editor" aria-labelledby="pig-record-edit-title" hidden>
@@ -1083,6 +1086,8 @@
           <textarea class="copy-input multiline" id="p-copy-text" aria-label="豚と野球の成功率のコピー用テキスト" rows="3" readonly>—</textarea>
           <button type="button" class="copy-btn" id="p-copy-btn" disabled>結果をコピー</button>
         </div>
+        <button type="button" class="history-transfer" id="history-transfer-copy" disabled>📦 結果＋修正履歴をコピー</button>
+        <p class="history-transfer-help" id="history-transfer-help">通常の結果文に引き継ぎコードを追加します。受け取った人は、計算機最下部の貼り付け欄へ全文を貼り付けてください。</p>
       </div>
       <div class="row">
         <div class="field">
@@ -1318,7 +1323,7 @@
 </dialog>
 
 <script src="./install.js" defer></script>
-<script src="./record-history.js?v=35" defer></script>
-<script src="./app.js?v=35" defer></script>
+<script src="./record-history.js?v=36" defer></script>
+<script src="./app.js?v=36" defer></script>
 </body>
 </html>

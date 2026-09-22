@@ -39,6 +39,7 @@
   const pResult = byId('p-result');
   const pCopyText = byId('p-copy-text');
   const pCopyBtn = byId('p-copy-btn');
+  const historyTransferCopyBtn = byId('history-transfer-copy');
   const pigQuickUndoBtn = byId('pig-quick-undo');
   const pigQuickStatus = byId('pig-quick-status');
   const pigQuickButtons = document.querySelectorAll('.pig-quick-btn');
@@ -146,9 +147,11 @@
   let statusTimer = null;
   let resetConfirmTimer = null;
   let restoreBackup = null;
+  let restoreRecordsBackup = null;
   let restoreToast = null;
   let applyingSnapshot = false;
   let pendingImportSnapshot = null;
+  let pendingImportRecords = null;
   const stepperSummaries = new Map();
   let nonCriticalStorageWarningShown = false;
   const feedbackTimers = new WeakMap();
@@ -374,6 +377,7 @@
     const remaining = quickRecords.length;
     pigQuickUndoBtn.disabled = remaining === 0;
     pigQuickUndoBtn.textContent = remaining > 0 ? `↶ 記録を1件戻す（${remaining}件）` : '↶ 記録を1件戻す';
+    historyTransferCopyBtn.disabled = remaining === 0 || !buildPigText();
     renderRecordHistory();
   }
 
@@ -405,7 +409,7 @@
       const row = document.createElement('div');
       row.className = 'record-history-row';
       const label = document.createElement('span');
-      const time = Number.isFinite(record.at) ? new Date(record.at).toLocaleString('ja-JP') : '以前の記録';
+      const time = Number.isFinite(record.at) ? new Date(record.at).toLocaleString('ja-JP') : record.transferred ? '引き継いだ記録' : '以前の記録';
       label.textContent = `${record.after.total}回目：${recordLabel(record.amount)}${record.edited ? '（修正済み）' : ''} — ${time}`;
       const edit = document.createElement('button');
       edit.type = 'button';
@@ -516,6 +520,7 @@
     pResult.textContent = fmt(pRate);
     setCopyOutput(pCopyText, pCopyBtn, buildPigAndBaseballText());
     updateCombo();
+    refreshQuickUndo();
   }
 
   function updateBaseball() {
@@ -713,11 +718,29 @@
     if (found === 0) return { error: 'この計算機の結果を読み取れませんでした。コピーした文章をそのまま貼り付けてください。' };
     const normalized = normalizeSnapshot(next);
     if (!normalized) return { error: '読み取った数値を安全に反映できません。内容を確認してください。' };
-    return { snapshot: normalized };
+    let records = null;
+    try {
+      const outcomes = PigRecordHistory.decode(text);
+      if (outcomes) {
+        records = PigRecordHistory.rebuild({
+          total: normalized.pTotal,
+          success: normalized.pSuccess,
+          refunds: {
+            2000: normalized.pRefund2000Count, 2500: normalized.pRefund2500Count,
+            3000: normalized.pRefund3000Count, 3500: normalized.pRefund3500Count,
+            4000: normalized.pRefund4000Count, 4500: normalized.pRefundCount,
+          },
+        }, outcomes);
+      }
+    } catch (error) {
+      return { error: '引き継ぎコードが壊れているか、集計結果と一致しません。全文をコピーし直してください。' };
+    }
+    return { snapshot: normalized, records };
   }
 
   function closeImportPreview(clearText = false) {
     pendingImportSnapshot = null;
+    pendingImportRecords = null;
     importPreview.hidden = true;
     importSummary.textContent = '';
     if (clearText) importText.value = '';
@@ -1101,6 +1124,7 @@
     restoreToast?.remove();
     restoreToast = null;
     restoreBackup = null;
+    restoreRecordsBackup = null;
   }
 
   function applySnapshot(snapshot) {
@@ -1137,8 +1161,13 @@
     undoButton.addEventListener('click', () => {
       if (!restoreBackup) return;
       const backup = restoreBackup;
+      const recordsBackup = restoreRecordsBackup ? JSON.parse(JSON.stringify(restoreRecordsBackup)) : [];
       applyingSnapshot = true;
       applySnapshot(backup);
+      quickRecords = recordsBackup;
+      refreshQuickUndo();
+      if (quickRecords.length) pigQuickStatus.textContent = `${quickRecords.length}件の記録を順番に戻せます`;
+      saveInputs();
       applyingSnapshot = false;
       clearRestoreOffer();
       announce('反映前の状態へ戻しました。');
@@ -1160,6 +1189,7 @@
     }
     clearRestoreOffer();
     restoreBackup = normalizeSnapshot(captureSnapshot());
+    restoreRecordsBackup = JSON.parse(JSON.stringify(quickRecords));
     applyingSnapshot = true;
     applySnapshot(snapshot);
     applyingSnapshot = false;
@@ -1241,6 +1271,32 @@
       announce('コピーできませんでした。テキストを選択して手動でコピーしてください。');
     }
   }
+
+  function buildHistoryTransferText() {
+    if (!quickRecords.length) return null;
+    try {
+      PigRecordHistory.baseline(pigRecordState(), quickRecords);
+      const result = [buildRouletteText(), buildPigText(), buildBaseballText()].filter(Boolean).join('\n');
+      return result ? `${result}\n${PigRecordHistory.encode(quickRecords)}` : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  historyTransferCopyBtn.addEventListener('click', async () => {
+    const text = buildHistoryTransferText();
+    if (!text) {
+      announce('引き継げるワンタップ記録がありません。');
+      return;
+    }
+    const copied = await copyToClipboard(text);
+    if (copied) {
+      flashCopied(historyTransferCopyBtn);
+      announce(`結果と修正履歴${quickRecords.length}件をコピーしました。`);
+    } else {
+      announce('コピーできませんでした。ブラウザのクリップボード設定を確認してください。');
+    }
+  });
 
   const STEPPER_LABELS = {
     'r-total': 'ルーレット試行回数',
@@ -1397,7 +1453,8 @@
       return;
     }
     pendingImportSnapshot = parsed.snapshot;
-    importSummary.textContent = buildSnapshotText(parsed.snapshot);
+    pendingImportRecords = parsed.records;
+    importSummary.textContent = `${buildSnapshotText(parsed.snapshot)}${parsed.records ? `\n\n🐷個別修正履歴：${parsed.records.length}件を引き継ぎ` : ''}`;
     importPreview.hidden = false;
     importApplyBtn.focus();
   });
@@ -1415,14 +1472,23 @@
   importApplyBtn.addEventListener('click', () => {
     if (!pendingImportSnapshot) return;
     const snapshot = pendingImportSnapshot;
+    const importedRecords = pendingImportRecords ? JSON.parse(JSON.stringify(pendingImportRecords)) : [];
     clearRestoreOffer();
     restoreBackup = normalizeSnapshot(captureSnapshot()) || emptySnapshot();
+    restoreRecordsBackup = JSON.parse(JSON.stringify(quickRecords));
     applyingSnapshot = true;
     applySnapshot(snapshot);
+    quickRecords = importedRecords;
+    refreshQuickUndo();
+    if (quickRecords.length) pigQuickStatus.textContent = `${quickRecords.length}件の修正履歴を引き継ぎました`;
+    saveInputs();
     applyingSnapshot = false;
     closeImportPreview(true);
-    showRestoreOffer('コピペから読み取った集計を反映しました。');
-    announce('コピペから読み取った集計を反映しました。');
+    const message = importedRecords.length
+      ? `集計と個別修正履歴${importedRecords.length}件を反映しました。`
+      : 'コピペから読み取った集計を反映しました。';
+    showRestoreOffer(message);
+    announce(message);
   });
 
   resetToggle.addEventListener('click', () => {

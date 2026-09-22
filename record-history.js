@@ -65,7 +65,71 @@
     }
     return { state, records: next };
   }
-  const api = { baseline, revise };
+
+  const SYMBOLS = new Map([[null, '0'], ...AMOUNTS.map((amount, index) => [amount, String(index + 1)])]);
+  const FROM_SYMBOL = new Map([...SYMBOLS].map(([amount, symbol]) => [symbol, amount]));
+  function checksum(text) {
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+  }
+  function encode(records) {
+    if (!Array.isArray(records) || records.length < 1 || records.length > 500) throw Error('Invalid records');
+    const payload = records.map((record) => {
+      if (!record || !SYMBOLS.has(record.amount)) throw Error('Invalid record');
+      return SYMBOLS.get(record.amount);
+    }).join('');
+    return `【九条履歴:v1:${payload}:${checksum(payload)}】`;
+  }
+  function decode(text) {
+    const source = String(text);
+    const matches = [...source.matchAll(/【九条履歴:v1:([0-6]{1,500}):([0-9a-f]{8})】/gu)];
+    if (matches.length === 0) {
+      if (source.includes('【九条履歴:')) throw Error('Invalid transfer code');
+      return null;
+    }
+    if (matches.length !== 1 || checksum(matches[0][1]) !== matches[0][2]) throw Error('Invalid transfer code');
+    return [...matches[0][1]].map((symbol) => FROM_SYMBOL.get(symbol));
+  }
+  function rebuild(current, outcomes) {
+    validateState(current);
+    if (!Array.isArray(outcomes) || outcomes.length < 1 || outcomes.length > 500 ||
+        outcomes.some((amount) => !SYMBOLS.has(amount))) throw Error('Invalid outcomes');
+    const currentTotal = count(current.total), currentSuccess = count(current.success);
+    const successful = outcomes.filter((amount) => amount !== null).length;
+    const baseTotal = currentTotal - outcomes.length;
+    const baseSuccess = currentSuccess - successful;
+    if (baseTotal < 0 || baseSuccess < 0 || baseSuccess > baseTotal) throw Error('Invalid baseline');
+    const state = copy(current);
+    for (const amount of AMOUNTS) {
+      state.refunds[amount] -= outcomes.filter((value) => value === amount).length;
+      if (!validCount(state.refunds[amount])) throw Error('Invalid refund baseline');
+    }
+    state.total = baseTotal === 0 && baseSuccess === 0 ? '' : String(baseTotal);
+    state.success = baseTotal === 0 && baseSuccess === 0 ? '' : String(baseSuccess);
+    validateState(state);
+    const records = [];
+    for (const amount of outcomes) {
+      const refund = amount === null ? null : state.refunds[amount];
+      const record = {
+        transferred: true,
+        amount,
+        before: { total: state.total, success: state.success, refund },
+      };
+      state.total = String(count(state.total) + 1);
+      state.success = String(count(state.success) + Number(amount !== null));
+      if (amount !== null) state.refunds[amount] += 1;
+      record.after = { total: state.total, success: state.success, refund: amount === null ? null : state.refunds[amount] };
+      records.push(record);
+    }
+    validateState(state);
+    if (JSON.stringify(state) !== JSON.stringify(current)) throw Error('Inconsistent rebuild');
+    return records;
+  }
+  const api = { baseline, revise, encode, decode, rebuild };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PigRecordHistory = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
