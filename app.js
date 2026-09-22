@@ -42,6 +42,15 @@
   const pigQuickUndoBtn = byId('pig-quick-undo');
   const pigQuickStatus = byId('pig-quick-status');
   const pigQuickButtons = document.querySelectorAll('.pig-quick-btn');
+  const recordSummary = byId('pig-record-summary');
+  const recordList = byId('pig-record-list');
+  const recordMore = byId('pig-record-more');
+  const recordEditor = byId('pig-record-editor');
+  const recordChoice = byId('pig-record-choice');
+  const recordPreview = byId('pig-record-edit-preview');
+  const recordApply = byId('pig-record-apply');
+  let recordVisibleCount = 20;
+  let selectedRecord = null;
   const pRefundCountEl = byId('p-refund-count');
   const pRefundMinusBtn = byId('p-refund-minus');
   const pRefundPlusBtn = byId('p-refund-plus');
@@ -365,6 +374,133 @@
     const remaining = quickRecords.length;
     pigQuickUndoBtn.disabled = remaining === 0;
     pigQuickUndoBtn.textContent = remaining > 0 ? `↶ 記録を1件戻す（${remaining}件）` : '↶ 記録を1件戻す';
+    renderRecordHistory();
+  }
+
+  function pigRecordState() {
+    return {
+      total: pTotal.value, success: pSuccess.value,
+      refunds: Object.fromEntries(Object.entries(refundCounters).map(([amount, counter]) => [amount, counter.get()])),
+    };
+  }
+
+  const recordLabel = (amount) => amount === null ? '✕ 失敗' : `⭕️ ${amount}還元`;
+
+  function closeRecordEditor() {
+    selectedRecord = null;
+    recordEditor.hidden = true;
+  }
+
+  function renderRecordHistory() {
+    closeRecordEditor();
+    recordSummary.textContent = `過去の記録を選んで修正（${quickRecords.length}件）`;
+    recordList.replaceChildren();
+    if (!quickRecords.length) {
+      const empty = document.createElement('p');
+      empty.textContent = 'まだ記録がありません。「結果を1回で記録」の操作がここに並びます。';
+      recordList.append(empty);
+    }
+    quickRecords.slice(-recordVisibleCount).reverse().forEach((record, offset) => {
+      const index = quickRecords.length - 1 - offset;
+      const row = document.createElement('div');
+      row.className = 'record-history-row';
+      const label = document.createElement('span');
+      const time = Number.isFinite(record.at) ? new Date(record.at).toLocaleString('ja-JP') : '以前の記録';
+      label.textContent = `${record.after.total}回目：${recordLabel(record.amount)}${record.edited ? '（修正済み）' : ''} — ${time}`;
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.textContent = '修正';
+      edit.setAttribute('aria-label', `${record.after.total}回目の${recordLabel(record.amount)}を修正`);
+      edit.addEventListener('click', () => {
+        selectedRecord = { index, record, state: JSON.stringify(pigRecordState()) };
+        byId('pig-record-edit-title').textContent = `${record.after.total}回目：${recordLabel(record.amount)}を修正`;
+        recordChoice.value = record.amount === null ? 'failure' : String(record.amount);
+        recordEditor.hidden = false;
+        previewRecordEdit();
+        recordChoice.focus({ preventScroll: true });
+        recordEditor.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+      row.append(label, edit);
+      recordList.append(row);
+    });
+    recordMore.hidden = quickRecords.length <= recordVisibleCount;
+  }
+
+  function prepareRecordEdit() {
+    if (!selectedRecord || quickRecords[selectedRecord.index] !== selectedRecord.record ||
+        JSON.stringify(pigRecordState()) !== selectedRecord.state) throw Error('Stale edit');
+    const replacement = recordChoice.value === 'failure' ? null : recordChoice.value === 'delete' ? 'delete' : Number(recordChoice.value);
+    return { replacement, ...PigRecordHistory.revise(pigRecordState(), quickRecords, selectedRecord.index, replacement) };
+  }
+
+  function previewRecordEdit() {
+    try {
+      const next = prepareRecordEdit();
+      const current = pigRecordState();
+      const changes = [
+        `${recordLabel(selectedRecord.record.amount)} → ${next.replacement === 'delete' ? 'この1件を削除' : recordLabel(next.replacement)}`,
+        `試行：${current.total || 0} → ${next.state.total || 0}回 ／ 成功：${current.success || 0} → ${next.state.success || 0}回`,
+      ];
+      for (const amount of Object.keys(refundCounters)) {
+        if (current.refunds[amount] !== next.state.refunds[amount]) changes.push(`${amount}還元：${current.refunds[amount]} → ${next.state.refunds[amount]}回`);
+      }
+      changes.push('この後に記録した結果はそのまま残ります。');
+      recordPreview.textContent = changes.join('\n');
+      recordApply.disabled = next.replacement === selectedRecord.record.amount;
+      recordApply.textContent = next.replacement === 'delete' ? 'この1件を削除する' : '変更を確定';
+    } catch (error) {
+      recordPreview.textContent = '集計が変更されています。一覧から選び直してください。';
+      recordApply.disabled = true;
+    }
+  }
+
+  recordChoice.addEventListener('change', previewRecordEdit);
+  recordMore.addEventListener('click', () => {
+    recordVisibleCount += 20;
+    renderRecordHistory();
+  });
+  byId('pig-record-cancel').addEventListener('click', () => {
+    closeRecordEditor();
+    recordSummary.focus();
+  });
+  recordApply.addEventListener('click', () => {
+    try {
+      const next = prepareRecordEdit();
+      if (next.replacement === selectedRecord.record.amount) return;
+      const message = `🐷 ${selectedRecord.record.after.total}回目：${recordLabel(selectedRecord.record.amount)} → ${next.replacement === 'delete' ? '削除' : recordLabel(next.replacement)}`;
+      if (resetConfirmationIsOpen()) setResetConfirmation(false);
+      closeImportPreview();
+      pTotal.value = next.state.total;
+      pSuccess.value = next.state.success;
+      Object.entries(refundCounters).forEach(([amount, counter]) => counter.set(next.state.refunds[amount]));
+      quickRecords = next.records;
+      renderRefundCount();
+      updatePig(true);
+      saveInputs();
+      refreshQuickUndo();
+      pigQuickStatus.textContent = message;
+      showRecordEditToast(message);
+      recordSummary.focus();
+      playClickSound();
+    } catch (error) {
+      announce('数値が変更されたか上限を超えるため、修正できません。一覧から選び直してください。');
+    }
+  });
+
+  function showRecordEditToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'stepper-toast';
+    const text = document.createElement('span');
+    text.className = 'stepper-toast-message';
+    text.textContent = message;
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'stepper-toast-dismiss';
+    dismiss.textContent = '消去';
+    const timer = window.setTimeout(() => toast.remove(), toastDurationSeconds * 1000);
+    dismiss.addEventListener('click', () => { window.clearTimeout(timer); toast.remove(); });
+    toast.append(text, dismiss);
+    stepperToastStack.append(toast);
   }
 
   function clearQuickUndo() {
@@ -615,6 +751,7 @@
     pSuccess.value = String(successful + Number(success));
     if (refund) refund.set(refund.get() + 1);
     quickRecords.push({
+      at: Date.now(),
       before,
       after: { total: pTotal.value, success: pSuccess.value, refund: refund?.get() ?? null },
       amount,
@@ -752,6 +889,11 @@
 
   function normalizeQuickRecords(raw) {
     if (!Array.isArray(raw)) return [];
+    try {
+      PigRecordHistory.baseline(pigRecordState(), raw.slice(-QUICK_UNDO_LIMIT));
+    } catch (error) {
+      return [];
+    }
     const records = [];
     for (const record of raw.slice(-QUICK_UNDO_LIMIT)) {
       if (!record || typeof record !== 'object' || !record.before || !record.after) return [];
@@ -1649,6 +1791,7 @@
   });
 
   loadInputs();
+  refreshQuickUndo();
   renderRefundCount();
   loadSettings();
   updateRoulette();

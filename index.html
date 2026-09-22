@@ -518,6 +518,24 @@
   }
   .pig-quick-undo:disabled { opacity: 0.4; cursor: not-allowed; }
   .pig-quick-status { color: var(--text-dim); font-size: 11px; line-height: 1.4; }
+  .record-history { margin-top: 12px; border: 1px solid #78534a; border-radius: 10px; padding: 10px; }
+  .record-history summary { color: var(--pig); cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; }
+  .record-history summary::before { content: '▸'; margin-right: 8px; }
+  .record-history[open] summary::before { content: '▾'; }
+  .record-history [hidden] { display: none !important; }
+  .record-history p { color: var(--text-dim); font-size: 12px; line-height: 1.6; margin: 8px 0; }
+  .record-history-list { max-height: 360px; overflow-y: auto; overscroll-behavior: contain; }
+  .record-history-row { padding: 10px 0; border-bottom: 1px solid #51423f; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+  .record-history-row span { font-size: 13px; overflow-wrap: anywhere; }
+  .record-history button, .record-history select { min-height: 44px; font-size: 16px; border: 1px solid #a8948f; border-radius: 8px; padding: 8px 12px; background: #22272e; color: #fff; touch-action: manipulation; }
+  .record-history button { cursor: pointer; flex-shrink: 0; }
+  .record-history button:disabled { opacity: .45; cursor: not-allowed; }
+  .record-history button:focus-visible, .record-history select:focus-visible { outline: 2px solid var(--pig); outline-offset: 2px; }
+  .record-history label { display: block; margin: 10px 0 6px; font-size: 14px; }
+  .record-history select { width: 100%; }
+  .record-edit-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .record-history .record-edit-apply { background: var(--pig); color: #171717; font-weight: 700; }
+  .record-history .record-edit-preview { white-space: pre-line; color: #fff; }
   .pig-quick-copy-label { margin-top: 14px; color: var(--pig); font-size: 12px; font-weight: 700; }
   .pig-quick .copy-row { flex-direction: column; }
   .pig-quick .copy-row .copy-input { width: 100%; }
@@ -1035,6 +1053,31 @@
           <button type="button" class="pig-quick-undo" id="pig-quick-undo" disabled>↶ 記録を1件戻す</button>
           <span class="pig-quick-status" id="pig-quick-status" role="status" aria-live="polite">記録すると順番に戻せます</span>
         </div>
+        <details class="record-history" id="pig-record-history">
+          <summary id="pig-record-summary">過去の記録を選んで修正（0件）</summary>
+          <p>ワンタップ記録を最大500件まで個別に修正できます。手入力・還元の＋／－操作・集計の反映・一括消去をすると、この一覧はリセットされます。貼り付けた集計の内訳は復元できません。</p>
+          <div id="pig-record-list" class="record-history-list"></div>
+          <button type="button" id="pig-record-more" hidden>さらに20件表示</button>
+          <section id="pig-record-editor" aria-labelledby="pig-record-edit-title" hidden>
+            <h3 id="pig-record-edit-title">記録を修正</h3>
+            <label for="pig-record-choice">変更後の結果</label>
+            <select id="pig-record-choice">
+              <option value="failure">✕ 失敗</option>
+              <option value="2000">⭕️ 2000還元</option>
+              <option value="2500">⭕️ 2500還元</option>
+              <option value="3000">⭕️ 3000還元</option>
+              <option value="3500">⭕️ 3500還元</option>
+              <option value="4000">⭕️ 4000還元</option>
+              <option value="4500">⭕️ 4500還元</option>
+              <option value="delete">この1件を削除（試行数も減ります）</option>
+            </select>
+            <p id="pig-record-edit-preview" class="record-edit-preview" role="status" aria-live="polite"></p>
+            <div class="record-edit-actions">
+              <button type="button" id="pig-record-apply" class="record-edit-apply">変更を確定</button>
+              <button type="button" id="pig-record-cancel">キャンセル</button>
+            </div>
+          </section>
+        </details>
         <div class="pig-quick-copy-label">📋 現在の豚＋野球の結果をコピペ</div>
         <div class="copy-row">
           <textarea class="copy-input multiline" id="p-copy-text" aria-label="豚と野球の成功率のコピー用テキスト" rows="3" readonly>—</textarea>
@@ -1275,6 +1318,7 @@
 </dialog>
 
 <script src="./install.js" defer></script>
-<script src="./app.js" defer></script>
+<script src="./record-history.js?v=35" defer></script>
+<script src="./app.js?v=35" defer></script>
 </body>
 </html>
