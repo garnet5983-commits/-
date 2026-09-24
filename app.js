@@ -80,6 +80,9 @@
   const bResult = byId('b-result');
   const bCopyText = byId('b-copy-text');
   const bCopyBtn = byId('b-copy-btn');
+  const baseballQuickButtons = document.querySelectorAll('.baseball-quick-btn');
+  const baseballQuickUndoBtn = byId('baseball-quick-undo');
+  const baseballQuickStatus = byId('baseball-quick-status');
 
   const comboResult = byId('combo-result');
   const comboLabel = byId('combo-label');
@@ -135,6 +138,7 @@
   let pRefund2500Count = 0;
   let pRefund2000Count = 0;
   let rouletteQuickRecords = [];
+  let baseballQuickRecords = [];
   let quickRecords = [];
   const refundCounters = {
     2000: { get: () => pRefund2000Count, set: (value) => { pRefund2000Count = value; } },
@@ -153,6 +157,7 @@
   let restoreBackup = null;
   let restoreRecordsBackup = null;
   let restoreRouletteRecordsBackup = null;
+  let restoreBaseballRecordsBackup = null;
   let restoreToast = null;
   let applyingSnapshot = false;
   let pendingImportSnapshot = null;
@@ -346,11 +351,15 @@
     const pText = buildPigText();
     const bText = buildBaseballText();
     const cText = buildComboText();
+    const combinedResults = [rText, pText, bText].filter(Boolean).join('\n');
 
-    if (pText) {
-      const combined = [rText, pText, bText].filter(Boolean).join('\n');
-      twoCopyText.value = combined;
-      twoCopyText.dataset.text = combined;
+    setCopyOutput(rCopyText, rCopyBtn, combinedResults || null);
+    setCopyOutput(pCopyText, pCopyBtn, combinedResults || null);
+    setCopyOutput(bCopyText, bCopyBtn, combinedResults || null);
+
+    if (combinedResults) {
+      twoCopyText.value = combinedResults;
+      twoCopyText.dataset.text = combinedResults;
       twoCopyBtn.disabled = false;
     } else {
       twoCopyText.value = '—';
@@ -375,7 +384,6 @@
     rData = validatePair(rSuccess, rTotal, rError);
     rRate = rData ? rData.success / rData.total : null;
     rResult.textContent = fmt(rRate);
-    setCopyOutput(rCopyText, rCopyBtn, buildRouletteText());
     updateCombo();
     refreshRouletteQuickUndo();
   }
@@ -537,19 +545,30 @@
     pData = validatePair(pSuccess, pTotal, pError);
     pRate = pData ? pData.success / pData.total : null;
     pResult.textContent = fmt(pRate);
-    setCopyOutput(pCopyText, pCopyBtn, buildPigAndBaseballText());
     updateCombo();
     refreshQuickUndo();
   }
 
-  function updateBaseball() {
+  function updateBaseball(preserveQuickUndo = false) {
+    if (!preserveQuickUndo) clearBaseballQuickUndo();
     bData = validatePair(bSuccess, bTotal, bError);
     bRate = bData ? bData.success / bData.total : null;
     bResult.textContent = fmt(bRate);
-    setCopyOutput(bCopyText, bCopyBtn, buildBaseballText());
-    setCopyOutput(pCopyText, pCopyBtn, buildPigAndBaseballText());
     updateAllCopyText();
     updateSnapshotSaveButton();
+    refreshBaseballQuickUndo();
+  }
+
+  function refreshBaseballQuickUndo() {
+    const remaining = baseballQuickRecords.length;
+    baseballQuickUndoBtn.disabled = remaining === 0;
+    baseballQuickUndoBtn.textContent = remaining > 0 ? `↶ 記録を1件戻す（${remaining}件）` : '↶ 記録を1件戻す';
+  }
+
+  function clearBaseballQuickUndo() {
+    baseballQuickRecords = [];
+    refreshBaseballQuickUndo();
+    baseballQuickStatus.textContent = '記録すると順番に戻せます';
   }
 
   function captureSnapshot() {
@@ -829,6 +848,70 @@
     playClickSound();
   });
 
+  function recordBaseballResult(button) {
+    const success = button.dataset.result === 'success';
+    if (!success && button.dataset.result !== 'failure') return;
+
+    const totalState = parseCount(bTotal.value);
+    const successState = parseCount(bSuccess.value);
+    const blank = totalState.empty && successState.empty;
+    if (!blank && (!totalState.ok || !successState.ok || totalState.value < 1 || successState.value > totalState.value)) {
+      updateBaseball();
+      saveInputs();
+      announce('野球の回数入力を確認してから記録してください。');
+      return;
+    }
+
+    const total = blank ? 0 : totalState.value;
+    const successful = blank ? 0 : successState.value;
+    if (total >= MAX_COUNT || (success && successful >= MAX_COUNT)) {
+      announce('上限に達しているため記録できません。');
+      return;
+    }
+
+    const before = { total: bTotal.value, success: bSuccess.value };
+    bTotal.value = String(total + 1);
+    bSuccess.value = String(successful + Number(success));
+    baseballQuickRecords.push({
+      at: Date.now(),
+      success,
+      before,
+      after: { total: bTotal.value, success: bSuccess.value },
+    });
+    if (baseballQuickRecords.length > QUICK_UNDO_LIMIT) baseballQuickRecords.shift();
+    updateBaseball(true);
+    saveInputs();
+    baseballQuickStatus.textContent = `直前：${success ? '成功' : '失敗'}を記録しました`;
+    recordStepperAction(`baseball-quick-${success ? 'success' : 'failure'}`, 'plus', 1, (presses) =>
+      success
+        ? `⚾️成功：${presses}回記録（試行＋${presses}・成功＋${presses}）`
+        : `⚾️失敗：${presses}回記録（試行＋${presses}）`);
+    playClickSound();
+  }
+
+  baseballQuickButtons.forEach((button) => button.addEventListener('click', () => recordBaseballResult(button)));
+  baseballQuickUndoBtn.addEventListener('click', () => {
+    const record = baseballQuickRecords[baseballQuickRecords.length - 1];
+    if (!record) return;
+    if (bTotal.value !== record.after.total || bSuccess.value !== record.after.success) {
+      clearBaseballQuickUndo();
+      saveInputs();
+      announce('数値が変更されているため、記録を取り消せません。');
+      return;
+    }
+    bTotal.value = record.before.total;
+    bSuccess.value = record.before.success;
+    baseballQuickRecords.pop();
+    updateBaseball(true);
+    saveInputs();
+    baseballQuickStatus.textContent = `直前の${record.success ? '成功' : '失敗'}を取り消しました`;
+    recordStepperAction(`baseball-quick-${record.success ? 'success' : 'failure'}`, 'minus', 1, (presses) =>
+      record.success
+        ? `↶ ⚾️成功を${presses}回取り消し（試行－${presses}・成功－${presses}）`
+        : `↶ ⚾️失敗を${presses}回取り消し（試行－${presses}）`);
+    playClickSound();
+  });
+
   function recordPigResult(button) {
     const success = button.dataset.result === 'success';
     const amount = button.dataset.amount ? Number(button.dataset.amount) : null;
@@ -990,11 +1073,12 @@
       pRefund2500Count,
       pRefund2000Count,
       rouletteQuickRecords,
+      baseballQuickRecords,
       quickRecords,
     });
   }
 
-  function normalizeRouletteQuickRecords(raw) {
+  function normalizeBinaryQuickRecords(raw, currentTotal, currentSuccess) {
     if (!Array.isArray(raw)) return [];
     const records = [];
     for (const record of raw.slice(-QUICK_UNDO_LIMIT)) {
@@ -1019,8 +1103,16 @@
       records.push(record);
     }
     const latest = records[records.length - 1];
-    if (latest && (latest.after.total !== rTotal.value || latest.after.success !== rSuccess.value)) return [];
+    if (latest && (latest.after.total !== currentTotal || latest.after.success !== currentSuccess)) return [];
     return records;
+  }
+
+  function normalizeRouletteQuickRecords(raw) {
+    return normalizeBinaryQuickRecords(raw, rTotal.value, rSuccess.value);
+  }
+
+  function normalizeBaseballQuickRecords(raw) {
+    return normalizeBinaryQuickRecords(raw, bTotal.value, bSuccess.value);
   }
 
   function normalizeQuickRecords(raw) {
@@ -1084,11 +1176,14 @@
     const refund2000State = parseCount(String(data.pRefund2000Count ?? 0));
     pRefund2000Count = refund2000State.ok ? refund2000State.value : 0;
     rouletteQuickRecords = normalizeRouletteQuickRecords(data.rouletteQuickRecords);
+    baseballQuickRecords = normalizeBaseballQuickRecords(data.baseballQuickRecords);
     quickRecords = normalizeQuickRecords(data.quickRecords);
     renderRefundCount();
     refreshQuickUndo();
     refreshRouletteQuickUndo();
+    refreshBaseballQuickUndo();
     if (rouletteQuickRecords.length) rouletteQuickStatus.textContent = `${rouletteQuickRecords.length}件の記録を順番に戻せます`;
+    if (baseballQuickRecords.length) baseballQuickStatus.textContent = `${baseballQuickRecords.length}件の記録を順番に戻せます`;
     if (quickRecords.length) pigQuickStatus.textContent = `${quickRecords.length}件の記録を順番に戻せます`;
     if (stored.legacy) saveInputs();
   }
@@ -1242,6 +1337,7 @@
     restoreBackup = null;
     restoreRecordsBackup = null;
     restoreRouletteRecordsBackup = null;
+    restoreBaseballRecordsBackup = null;
   }
 
   function applySnapshot(snapshot) {
@@ -1258,11 +1354,12 @@
     pRefund2500Count = snapshot.pRefund2500Count;
     pRefund2000Count = snapshot.pRefund2000Count;
     clearRouletteQuickUndo();
+    clearBaseballQuickUndo();
     clearQuickUndo();
     renderRefundCount();
     updateRoulette(true);
     updatePig(true);
-    updateBaseball();
+    updateBaseball(true);
     saveInputs();
   }
 
@@ -1281,14 +1378,18 @@
       const backup = restoreBackup;
       const recordsBackup = restoreRecordsBackup ? JSON.parse(JSON.stringify(restoreRecordsBackup)) : [];
       const rouletteRecordsBackup = restoreRouletteRecordsBackup ? JSON.parse(JSON.stringify(restoreRouletteRecordsBackup)) : [];
+      const baseballRecordsBackup = restoreBaseballRecordsBackup ? JSON.parse(JSON.stringify(restoreBaseballRecordsBackup)) : [];
       applyingSnapshot = true;
       applySnapshot(backup);
       quickRecords = recordsBackup;
       rouletteQuickRecords = rouletteRecordsBackup;
+      baseballQuickRecords = baseballRecordsBackup;
       refreshQuickUndo();
       refreshRouletteQuickUndo();
+      refreshBaseballQuickUndo();
       if (quickRecords.length) pigQuickStatus.textContent = `${quickRecords.length}件の記録を順番に戻せます`;
       if (rouletteQuickRecords.length) rouletteQuickStatus.textContent = `${rouletteQuickRecords.length}件の記録を順番に戻せます`;
+      if (baseballQuickRecords.length) baseballQuickStatus.textContent = `${baseballQuickRecords.length}件の記録を順番に戻せます`;
       saveInputs();
       applyingSnapshot = false;
       clearRestoreOffer();
@@ -1313,6 +1414,7 @@
     restoreBackup = normalizeSnapshot(captureSnapshot());
     restoreRecordsBackup = JSON.parse(JSON.stringify(quickRecords));
     restoreRouletteRecordsBackup = JSON.parse(JSON.stringify(rouletteQuickRecords));
+    restoreBaseballRecordsBackup = JSON.parse(JSON.stringify(baseballQuickRecords));
     applyingSnapshot = true;
     applySnapshot(snapshot);
     applyingSnapshot = false;
@@ -1493,7 +1595,9 @@
         ? '豚のワンタップ記録'
         : targetId.startsWith('roulette-quick-')
           ? 'ルーレットのワンタップ記録'
-          : (STEPPER_LABELS[targetId] || '数値');
+          : targetId.startsWith('baseball-quick-')
+            ? '野球のワンタップ記録'
+            : (STEPPER_LABELS[targetId] || '数値');
       dismissButton.setAttribute('aria-label', `${label}の操作メッセージを消す`);
       dismissButton.addEventListener('click', () => {
         const activeSummary = stepperSummaries.get(key);
@@ -1604,6 +1708,7 @@
     restoreBackup = normalizeSnapshot(captureSnapshot()) || emptySnapshot();
     restoreRecordsBackup = JSON.parse(JSON.stringify(quickRecords));
     restoreRouletteRecordsBackup = JSON.parse(JSON.stringify(rouletteQuickRecords));
+    restoreBaseballRecordsBackup = JSON.parse(JSON.stringify(baseballQuickRecords));
     applyingSnapshot = true;
     applySnapshot(snapshot);
     quickRecords = importedRecords;
@@ -1990,7 +2095,7 @@
   loadSettings();
   updateRoulette(true);
   updatePig(true);
-  updateBaseball();
+  updateBaseball(true);
   loadHistory();
 
   if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
