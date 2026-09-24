@@ -484,6 +484,46 @@
     padding: 12px;
     margin-bottom: 16px;
   }
+  .roulette-quick {
+    border: 1px solid rgba(201, 162, 39, 0.55);
+    background: #242116;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+  .roulette-quick-title { color: var(--roulette); font-size: 14px; font-weight: 700; }
+  .roulette-quick-help { margin: 5px 0 11px; color: var(--text-dim); font-size: 11px; line-height: 1.5; }
+  .roulette-quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .roulette-quick-btn {
+    min-height: 54px;
+    border: 1px solid var(--roulette);
+    border-radius: 9px;
+    background: #16191f;
+    color: var(--roulette);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .roulette-quick-btn.failure { color: #e0e4ec; border-color: #777f8b; }
+  .roulette-quick-btn:active { background: #39331d; }
+  .roulette-quick-undo-row { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
+  .roulette-quick-undo {
+    flex-shrink: 0;
+    min-height: 44px;
+    border: 1px solid #aab2bd;
+    background: #242932;
+    color: #e0e4ec;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+  .roulette-quick-undo:disabled { opacity: 0.4; cursor: not-allowed; }
+  .roulette-quick-status { color: var(--text-dim); font-size: 11px; line-height: 1.4; }
   .pig-quick-title { color: var(--pig); font-size: 14px; font-weight: 700; }
   .pig-quick-help { margin: 5px 0 11px; color: var(--text-dim); font-size: 11px; line-height: 1.5; }
   .pig-quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -1007,6 +1047,18 @@
 
     <section class="card roulette" id="roulette-card" aria-labelledby="roulette-heading">
       <h2 id="roulette-heading">🎯 ルーレット成功率</h2>
+      <div class="roulette-quick" aria-label="ルーレットの結果を1回で記録">
+        <div class="roulette-quick-title">結果を1回で記録</div>
+        <p class="roulette-quick-help">「成功」は試行と成功を同時に＋1。「失敗」は試行だけを＋1します。</p>
+        <div class="roulette-quick-grid" role="group" aria-label="ルーレットの結果を記録">
+          <button type="button" class="roulette-quick-btn failure" data-result="failure">✕ 失敗</button>
+          <button type="button" class="roulette-quick-btn" data-result="success">⭕️ 成功</button>
+        </div>
+        <div class="roulette-quick-undo-row">
+          <button type="button" class="roulette-quick-undo" id="roulette-quick-undo" disabled>↶ 記録を1件戻す</button>
+          <span class="roulette-quick-status" id="roulette-quick-status" role="status" aria-live="polite">記録すると順番に戻せます</span>
+        </div>
+      </div>
       <div class="row">
         <div class="field">
           <label for="r-total">試行回数</label>
@@ -1323,7 +1375,7 @@
 </dialog>
 
 <script src="./install.js" defer></script>
-<script src="./record-history.js?v=36" defer></script>
-<script src="./app.js?v=36" defer></script>
+<script src="./record-history.js?v=37" defer></script>
+<script src="./app.js?v=37" defer></script>
 </body>
 </html>

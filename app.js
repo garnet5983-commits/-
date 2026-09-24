@@ -32,6 +32,9 @@
   const rResult = byId('r-result');
   const rCopyText = byId('r-copy-text');
   const rCopyBtn = byId('r-copy-btn');
+  const rouletteQuickButtons = document.querySelectorAll('.roulette-quick-btn');
+  const rouletteQuickUndoBtn = byId('roulette-quick-undo');
+  const rouletteQuickStatus = byId('roulette-quick-status');
 
   const pSuccess = byId('p-success');
   const pTotal = byId('p-total');
@@ -131,6 +134,7 @@
   let pRefund3500Count = 0;
   let pRefund2500Count = 0;
   let pRefund2000Count = 0;
+  let rouletteQuickRecords = [];
   let quickRecords = [];
   const refundCounters = {
     2000: { get: () => pRefund2000Count, set: (value) => { pRefund2000Count = value; } },
@@ -148,6 +152,7 @@
   let resetConfirmTimer = null;
   let restoreBackup = null;
   let restoreRecordsBackup = null;
+  let restoreRouletteRecordsBackup = null;
   let restoreToast = null;
   let applyingSnapshot = false;
   let pendingImportSnapshot = null;
@@ -365,12 +370,26 @@
     }
   }
 
-  function updateRoulette() {
+  function updateRoulette(preserveQuickUndo = false) {
+    if (!preserveQuickUndo) clearRouletteQuickUndo();
     rData = validatePair(rSuccess, rTotal, rError);
     rRate = rData ? rData.success / rData.total : null;
     rResult.textContent = fmt(rRate);
     setCopyOutput(rCopyText, rCopyBtn, buildRouletteText());
     updateCombo();
+    refreshRouletteQuickUndo();
+  }
+
+  function refreshRouletteQuickUndo() {
+    const remaining = rouletteQuickRecords.length;
+    rouletteQuickUndoBtn.disabled = remaining === 0;
+    rouletteQuickUndoBtn.textContent = remaining > 0 ? `↶ 記録を1件戻す（${remaining}件）` : '↶ 記録を1件戻す';
+  }
+
+  function clearRouletteQuickUndo() {
+    rouletteQuickRecords = [];
+    refreshRouletteQuickUndo();
+    rouletteQuickStatus.textContent = '記録すると順番に戻せます';
   }
 
   function refreshQuickUndo() {
@@ -746,6 +765,70 @@
     if (clearText) importText.value = '';
   }
 
+  function recordRouletteResult(button) {
+    const success = button.dataset.result === 'success';
+    if (!success && button.dataset.result !== 'failure') return;
+
+    const totalState = parseCount(rTotal.value);
+    const successState = parseCount(rSuccess.value);
+    const blank = totalState.empty && successState.empty;
+    if (!blank && (!totalState.ok || !successState.ok || totalState.value < 1 || successState.value > totalState.value)) {
+      updateRoulette();
+      saveInputs();
+      announce('ルーレットの回数入力を確認してから記録してください。');
+      return;
+    }
+
+    const total = blank ? 0 : totalState.value;
+    const successful = blank ? 0 : successState.value;
+    if (total >= MAX_COUNT || (success && successful >= MAX_COUNT)) {
+      announce('上限に達しているため記録できません。');
+      return;
+    }
+
+    const before = { total: rTotal.value, success: rSuccess.value };
+    rTotal.value = String(total + 1);
+    rSuccess.value = String(successful + Number(success));
+    rouletteQuickRecords.push({
+      at: Date.now(),
+      success,
+      before,
+      after: { total: rTotal.value, success: rSuccess.value },
+    });
+    if (rouletteQuickRecords.length > QUICK_UNDO_LIMIT) rouletteQuickRecords.shift();
+    updateRoulette(true);
+    saveInputs();
+    rouletteQuickStatus.textContent = `直前：${success ? '成功' : '失敗'}を記録しました`;
+    recordStepperAction(`roulette-quick-${success ? 'success' : 'failure'}`, 'plus', 1, (presses) =>
+      success
+        ? `🎯成功：${presses}回記録（試行＋${presses}・成功＋${presses}）`
+        : `🎯失敗：${presses}回記録（試行＋${presses}）`);
+    playClickSound();
+  }
+
+  rouletteQuickButtons.forEach((button) => button.addEventListener('click', () => recordRouletteResult(button)));
+  rouletteQuickUndoBtn.addEventListener('click', () => {
+    const record = rouletteQuickRecords[rouletteQuickRecords.length - 1];
+    if (!record) return;
+    if (rTotal.value !== record.after.total || rSuccess.value !== record.after.success) {
+      clearRouletteQuickUndo();
+      saveInputs();
+      announce('数値が変更されているため、記録を取り消せません。');
+      return;
+    }
+    rTotal.value = record.before.total;
+    rSuccess.value = record.before.success;
+    rouletteQuickRecords.pop();
+    updateRoulette(true);
+    saveInputs();
+    rouletteQuickStatus.textContent = `直前の${record.success ? '成功' : '失敗'}を取り消しました`;
+    recordStepperAction(`roulette-quick-${record.success ? 'success' : 'failure'}`, 'minus', 1, (presses) =>
+      record.success
+        ? `↶ 🎯成功を${presses}回取り消し（試行－${presses}・成功－${presses}）`
+        : `↶ 🎯失敗を${presses}回取り消し（試行－${presses}）`);
+    playClickSound();
+  });
+
   function recordPigResult(button) {
     const success = button.dataset.result === 'success';
     const amount = button.dataset.amount ? Number(button.dataset.amount) : null;
@@ -906,8 +989,38 @@
       pRefund3500Count,
       pRefund2500Count,
       pRefund2000Count,
+      rouletteQuickRecords,
       quickRecords,
     });
+  }
+
+  function normalizeRouletteQuickRecords(raw) {
+    if (!Array.isArray(raw)) return [];
+    const records = [];
+    for (const record of raw.slice(-QUICK_UNDO_LIMIT)) {
+      if (!record || typeof record !== 'object' || typeof record.success !== 'boolean' ||
+          !record.before || !record.after || typeof record.before.total !== 'string' ||
+          typeof record.before.success !== 'string' || typeof record.after.total !== 'string' ||
+          typeof record.after.success !== 'string') return [];
+      const beforeTotal = parseCount(record.before.total);
+      const beforeSuccess = parseCount(record.before.success);
+      const empty = beforeTotal.empty && beforeSuccess.empty;
+      if (!empty && (!beforeTotal.ok || !beforeSuccess.ok || beforeTotal.value < 1 ||
+          beforeSuccess.value > beforeTotal.value)) return [];
+      const total = empty ? 0 : beforeTotal.value;
+      const success = empty ? 0 : beforeSuccess.value;
+      if (total >= MAX_COUNT || (record.success && success >= MAX_COUNT) ||
+          record.after.total !== String(total + 1) ||
+          record.after.success !== String(success + Number(record.success))) return [];
+      if (records.length > 0) {
+        const previous = records[records.length - 1];
+        if (previous.after.total !== record.before.total || previous.after.success !== record.before.success) return [];
+      }
+      records.push(record);
+    }
+    const latest = records[records.length - 1];
+    if (latest && (latest.after.total !== rTotal.value || latest.after.success !== rSuccess.value)) return [];
+    return records;
   }
 
   function normalizeQuickRecords(raw) {
@@ -970,9 +1083,12 @@
     pRefund2500Count = refund2500State.ok ? refund2500State.value : 0;
     const refund2000State = parseCount(String(data.pRefund2000Count ?? 0));
     pRefund2000Count = refund2000State.ok ? refund2000State.value : 0;
+    rouletteQuickRecords = normalizeRouletteQuickRecords(data.rouletteQuickRecords);
     quickRecords = normalizeQuickRecords(data.quickRecords);
     renderRefundCount();
     refreshQuickUndo();
+    refreshRouletteQuickUndo();
+    if (rouletteQuickRecords.length) rouletteQuickStatus.textContent = `${rouletteQuickRecords.length}件の記録を順番に戻せます`;
     if (quickRecords.length) pigQuickStatus.textContent = `${quickRecords.length}件の記録を順番に戻せます`;
     if (stored.legacy) saveInputs();
   }
@@ -1125,6 +1241,7 @@
     restoreToast = null;
     restoreBackup = null;
     restoreRecordsBackup = null;
+    restoreRouletteRecordsBackup = null;
   }
 
   function applySnapshot(snapshot) {
@@ -1140,9 +1257,10 @@
     pRefund3000Count = snapshot.pRefund3000Count;
     pRefund2500Count = snapshot.pRefund2500Count;
     pRefund2000Count = snapshot.pRefund2000Count;
+    clearRouletteQuickUndo();
     clearQuickUndo();
     renderRefundCount();
-    updateRoulette();
+    updateRoulette(true);
     updatePig(true);
     updateBaseball();
     saveInputs();
@@ -1162,11 +1280,15 @@
       if (!restoreBackup) return;
       const backup = restoreBackup;
       const recordsBackup = restoreRecordsBackup ? JSON.parse(JSON.stringify(restoreRecordsBackup)) : [];
+      const rouletteRecordsBackup = restoreRouletteRecordsBackup ? JSON.parse(JSON.stringify(restoreRouletteRecordsBackup)) : [];
       applyingSnapshot = true;
       applySnapshot(backup);
       quickRecords = recordsBackup;
+      rouletteQuickRecords = rouletteRecordsBackup;
       refreshQuickUndo();
+      refreshRouletteQuickUndo();
       if (quickRecords.length) pigQuickStatus.textContent = `${quickRecords.length}件の記録を順番に戻せます`;
+      if (rouletteQuickRecords.length) rouletteQuickStatus.textContent = `${rouletteQuickRecords.length}件の記録を順番に戻せます`;
       saveInputs();
       applyingSnapshot = false;
       clearRestoreOffer();
@@ -1190,6 +1312,7 @@
     clearRestoreOffer();
     restoreBackup = normalizeSnapshot(captureSnapshot());
     restoreRecordsBackup = JSON.parse(JSON.stringify(quickRecords));
+    restoreRouletteRecordsBackup = JSON.parse(JSON.stringify(rouletteQuickRecords));
     applyingSnapshot = true;
     applySnapshot(snapshot);
     applyingSnapshot = false;
@@ -1366,7 +1489,11 @@
       dismissButton.type = 'button';
       dismissButton.className = 'stepper-toast-dismiss';
       dismissButton.textContent = '消去';
-      const label = targetId.startsWith('pig-quick-') ? '豚のワンタップ記録' : (STEPPER_LABELS[targetId] || '数値');
+      const label = targetId.startsWith('pig-quick-')
+        ? '豚のワンタップ記録'
+        : targetId.startsWith('roulette-quick-')
+          ? 'ルーレットのワンタップ記録'
+          : (STEPPER_LABELS[targetId] || '数値');
       dismissButton.setAttribute('aria-label', `${label}の操作メッセージを消す`);
       dismissButton.addEventListener('click', () => {
         const activeSummary = stepperSummaries.get(key);
@@ -1476,6 +1603,7 @@
     clearRestoreOffer();
     restoreBackup = normalizeSnapshot(captureSnapshot()) || emptySnapshot();
     restoreRecordsBackup = JSON.parse(JSON.stringify(quickRecords));
+    restoreRouletteRecordsBackup = JSON.parse(JSON.stringify(rouletteQuickRecords));
     applyingSnapshot = true;
     applySnapshot(snapshot);
     quickRecords = importedRecords;
@@ -1860,7 +1988,7 @@
   refreshQuickUndo();
   renderRefundCount();
   loadSettings();
-  updateRoulette();
+  updateRoulette(true);
   updatePig(true);
   updateBaseball();
   loadHistory();
