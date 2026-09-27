@@ -124,6 +124,7 @@
   const importSummary = byId('import-summary');
   const importCancelBtn = byId('import-cancel');
   const importApplyBtn = byId('import-apply');
+  const quickNavLinks = Array.from(document.querySelectorAll('.quick-nav a'));
 
   let rData = null;
   let pData = null;
@@ -167,11 +168,42 @@
   const feedbackTimers = new WeakMap();
 
   // 使用頻度の高い順に並べ、各種設定は集計欄の下へまとめる。
-  [pigCard, rouletteCard, baseballCard, comboCard].forEach((card) => {
+  [rouletteCard, pigCard, baseballCard, comboCard].forEach((card) => {
     mainContent.insertBefore(card, snapshotSaveBtn.parentElement);
   });
   mainContent.insertBefore(settingsBar, resetArea);
   mainContent.insertBefore(importCard, statusMessage);
+
+  function setActiveQuickNav(targetId) {
+    quickNavLinks.forEach((link) => {
+      if (link.getAttribute('href') === `#${targetId}`) {
+        link.setAttribute('aria-current', 'location');
+      } else {
+        link.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  quickNavLinks.forEach((link) => {
+    link.addEventListener('click', (event) => {
+      const targetId = link.getAttribute('href').slice(1);
+      const target = byId(targetId);
+      if (!target) return;
+      event.preventDefault();
+      setActiveQuickNav(targetId);
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  if ('IntersectionObserver' in window) {
+    const quickNavObserver = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible) setActiveQuickNav(visible.target.id);
+    }, { rootMargin: '-15% 0px -55% 0px', threshold: [0.05, 0.25, 0.5] });
+    [rouletteCard, pigCard, baseballCard].forEach((card) => quickNavObserver.observe(card));
+  }
 
   function announce(message) {
     window.clearTimeout(statusTimer);
