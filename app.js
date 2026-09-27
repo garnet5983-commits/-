@@ -30,6 +30,7 @@
   const rTotal = byId('r-total');
   const rError = byId('r-error');
   const rResult = byId('r-result');
+  const rResultLabel = rResult.closest('.result').querySelector('.label');
   const rCopyText = byId('r-copy-text');
   const rCopyBtn = byId('r-copy-btn');
   const rouletteQuickButtons = document.querySelectorAll('.roulette-quick-btn');
@@ -40,6 +41,7 @@
   const pTotal = byId('p-total');
   const pError = byId('p-error');
   const pResult = byId('p-result');
+  const pResultLabel = pResult.closest('.result').querySelector('.label');
   const pCopyText = byId('p-copy-text');
   const pCopyBtn = byId('p-copy-btn');
   const historyTransferCopyBtn = byId('history-transfer-copy');
@@ -78,6 +80,7 @@
   const bTotal = byId('b-total');
   const bError = byId('b-error');
   const bResult = byId('b-result');
+  const bResultLabel = bResult.closest('.result').querySelector('.label');
   const bCopyText = byId('b-copy-text');
   const bCopyBtn = byId('b-copy-btn');
   const baseballQuickButtons = document.querySelectorAll('.baseball-quick-btn');
@@ -124,7 +127,8 @@
   const importSummary = byId('import-summary');
   const importCancelBtn = byId('import-cancel');
   const importApplyBtn = byId('import-apply');
-  const quickNavLinks = Array.from(document.querySelectorAll('.quick-nav a'));
+  const mainCopyCard = byId('main-copy-card');
+  const quickNavButtons = Array.from(document.querySelectorAll('.quick-nav [data-target]'));
 
   let rData = null;
   let pData = null;
@@ -167,43 +171,113 @@
   let nonCriticalStorageWarningShown = false;
   const feedbackTimers = new WeakMap();
 
-  // 使用頻度の高い順に並べ、各種設定は集計欄の下へまとめる。
-  [rouletteCard, pigCard, baseballCard, comboCard].forEach((card) => {
+  // 普段使う操作だけを表に出し、残りは折りたたんで画面を整理する。
+  [rouletteCard, pigCard, baseballCard].forEach((card) => {
+    card.classList.add('game-panel');
     mainContent.insertBefore(card, snapshotSaveBtn.parentElement);
   });
-  mainContent.insertBefore(settingsBar, resetArea);
-  mainContent.insertBefore(importCard, statusMessage);
 
-  function setActiveQuickNav(targetId) {
-    quickNavLinks.forEach((link) => {
-      if (link.getAttribute('href') === `#${targetId}`) {
-        link.setAttribute('aria-current', 'location');
-      } else {
-        link.removeAttribute('aria-current');
-      }
-    });
+  function makeAdvancedControls(card, label, nodes) {
+    const details = document.createElement('details');
+    details.className = 'advanced-controls';
+    const summary = document.createElement('summary');
+    summary.textContent = label;
+    const body = document.createElement('div');
+    body.className = 'advanced-controls-body';
+    nodes.filter(Boolean).forEach((node) => body.appendChild(node));
+    details.append(summary, body);
+    card.appendChild(details);
   }
 
-  quickNavLinks.forEach((link) => {
-    link.addEventListener('click', (event) => {
-      const targetId = link.getAttribute('href').slice(1);
-      const target = byId(targetId);
-      if (!target) return;
-      event.preventDefault();
-      setActiveQuickNav(targetId);
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+  const rouletteQuick = rouletteCard.querySelector('.roulette-quick');
+  const pigQuick = pigCard.querySelector('.pig-quick');
+  const baseballQuick = baseballCard.querySelector('.baseball-quick');
+  rouletteCard.insertBefore(rResult.closest('.result'), rouletteQuick);
+  pigCard.insertBefore(pResult.closest('.result'), pigQuick);
+  baseballCard.insertBefore(bResult.closest('.result'), baseballQuick);
+
+  makeAdvancedControls(rouletteCard, '⚙️ 手動入力・修正を開く', [
+    rouletteCard.querySelector('.row'),
+    rError,
+  ]);
+  makeAdvancedControls(pigCard, '⚙️ 手動入力・還元調整・記録修正を開く', [
+    pigCard.querySelector(':scope > .row'),
+    pError,
+    ...pigCard.querySelectorAll(':scope > .refund-control'),
+    byId('pig-record-history'),
+    historyTransferCopyBtn,
+    byId('history-transfer-help'),
+  ]);
+  makeAdvancedControls(baseballCard, '⚙️ 手動入力・修正を開く', [
+    baseballCard.querySelector('.row'),
+    bError,
+  ]);
+
+  [
+    rCopyText.closest('.copy-row'),
+    pCopyText.closest('.copy-row'),
+    pigCard.querySelector('.pig-quick-copy-label'),
+    bCopyText.closest('.copy-row'),
+  ].filter(Boolean).forEach((node) => { node.hidden = true; });
+
+  const combinedCopyArea = twoCopyText.closest('.combo-two');
+  combinedCopyArea.querySelector('.combo-two-label').textContent = '入力済みのルーレット・豚・野球をまとめてコピーできます';
+  twoCopyBtn.textContent = '全体結果をコピー';
+  mainCopyCard.appendChild(combinedCopyArea);
+
+  const moreTools = document.createElement('details');
+  moreTools.className = 'more-tools';
+  moreTools.id = 'more-tools';
+  const moreToolsSummary = document.createElement('summary');
+  moreToolsSummary.textContent = '⚙️ その他の機能・設定';
+  const moreToolsBody = document.createElement('div');
+  moreToolsBody.className = 'more-tools-body';
+  [
+    snapshotSaveBtn.parentElement,
+    historyToggle,
+    historyPanel,
+    comboCard,
+    settingsBar,
+    resetArea,
+    importCard,
+  ].forEach((node) => moreToolsBody.appendChild(node));
+  moreTools.append(moreToolsSummary, moreToolsBody);
+  mainContent.insertBefore(moreTools, statusMessage);
+
+  const gamePanels = [rouletteCard, pigCard, baseballCard];
+  gamePanels.forEach((card) => {
+    card.setAttribute('role', 'tabpanel');
+    const tab = quickNavButtons.find((button) => button.dataset.target === card.id);
+    if (tab) card.setAttribute('aria-labelledby', tab.id);
   });
 
-  if ('IntersectionObserver' in window) {
-    const quickNavObserver = new IntersectionObserver((entries) => {
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-      if (visible) setActiveQuickNav(visible.target.id);
-    }, { rootMargin: '-15% 0px -55% 0px', threshold: [0.05, 0.25, 0.5] });
-    [rouletteCard, pigCard, baseballCard].forEach((card) => quickNavObserver.observe(card));
+  function showGamePanel(targetId, scroll = false) {
+    gamePanels.forEach((card) => { card.hidden = card.id !== targetId; });
+    quickNavButtons.forEach((button) => {
+      const selected = button.dataset.target === targetId;
+      button.setAttribute('aria-selected', String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    });
+    if (scroll) {
+      window.requestAnimationFrame(() => {
+        byId(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
   }
+
+  quickNavButtons.forEach((button) => {
+    button.addEventListener('click', () => showGamePanel(button.dataset.target, true));
+    button.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      event.preventDefault();
+      const current = quickNavButtons.indexOf(button);
+      const direction = event.key === 'ArrowRight' ? 1 : -1;
+      const next = quickNavButtons[(current + direction + quickNavButtons.length) % quickNavButtons.length];
+      next.focus();
+      showGamePanel(next.dataset.target, true);
+    });
+  });
+  showGamePanel('roulette-card');
 
   function announce(message) {
     window.clearTimeout(statusTimer);
@@ -415,6 +489,7 @@
     if (!preserveQuickUndo) clearRouletteQuickUndo();
     rData = validatePair(rSuccess, rTotal, rError);
     rRate = rData ? rData.success / rData.total : null;
+    rResultLabel.textContent = rData ? `${rData.total}回中 ${rData.success}回成功` : '試行・成功を入力';
     rResult.textContent = fmt(rRate);
     updateCombo();
     refreshRouletteQuickUndo();
@@ -576,6 +651,7 @@
     if (!preserveQuickUndo) clearQuickUndo();
     pData = validatePair(pSuccess, pTotal, pError);
     pRate = pData ? pData.success / pData.total : null;
+    pResultLabel.textContent = pData ? `${pData.total}回中 ${pData.success}回成功` : '試行・成功を入力';
     pResult.textContent = fmt(pRate);
     updateCombo();
     refreshQuickUndo();
@@ -585,6 +661,7 @@
     if (!preserveQuickUndo) clearBaseballQuickUndo();
     bData = validatePair(bSuccess, bTotal, bError);
     bRate = bData ? bData.success / bData.total : null;
+    bResultLabel.textContent = bData ? `${bData.total}回中 ${bData.success}回成功` : '試行・成功を入力';
     bResult.textContent = fmt(bRate);
     updateAllCopyText();
     updateSnapshotSaveButton();

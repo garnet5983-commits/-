@@ -50,13 +50,8 @@
   #roulette-card { order: 10; }
   #pig-card { order: 20; }
   #baseball-card { order: 30; }
-  #combo-card { order: 40; }
-  #main-content > .snapshot-save-area { order: 50; }
-  #history-toggle { order: 60; }
-  #history-panel { order: 61; }
-  #settings-bar { order: 70; }
-  #reset-area { order: 80; }
-  #import-card { order: 90; }
+  #main-copy-card { order: 40; }
+  #more-tools { order: 50; }
   #status-message { order: 100; }
   #stepper-toast-stack { order: 101; }
   #roulette-card,
@@ -81,7 +76,7 @@
     -webkit-backdrop-filter: blur(14px);
     backdrop-filter: blur(14px);
   }
-  .quick-nav a {
+  .quick-nav button {
     min-width: 0;
     min-height: 46px;
     display: flex;
@@ -93,26 +88,105 @@
     background: #222831;
     font-size: 14px;
     font-weight: 800;
-    text-decoration: none;
     white-space: nowrap;
+    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
-  .quick-nav a:active { transform: scale(0.97); }
-  .quick-nav a[href="#roulette-card"][aria-current="location"] {
+  .quick-nav button:active { transform: scale(0.97); }
+  .quick-nav button[data-target="roulette-card"][aria-selected="true"] {
     color: #f1d267;
     border-color: var(--roulette);
     background: #332e1e;
   }
-  .quick-nav a[href="#pig-card"][aria-current="location"] {
+  .quick-nav button[data-target="pig-card"][aria-selected="true"] {
     color: #f0a293;
     border-color: var(--pig);
     background: #352423;
   }
-  .quick-nav a[href="#baseball-card"][aria-current="location"] {
+  .quick-nav button[data-target="baseball-card"][aria-selected="true"] {
     color: #f2c487;
     border-color: var(--baseball);
     background: #352a20;
   }
+
+  .game-panel[hidden] { display: none !important; }
+  .game-panel > .result {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--panel-edge);
+    border-radius: 10px;
+    background: #14181e;
+  }
+  .game-panel > .result .value { font-size: 27px; }
+
+  .advanced-controls,
+  .more-tools {
+    margin-top: 14px;
+    border: 1px solid #3a424d;
+    border-radius: 11px;
+    background: #171b21;
+    overflow: hidden;
+  }
+  .advanced-controls > summary,
+  .more-tools > summary {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 11px 14px;
+    color: #c7ccd4;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    list-style: none;
+  }
+  .advanced-controls > summary::-webkit-details-marker,
+  .more-tools > summary::-webkit-details-marker { display: none; }
+  .advanced-controls > summary::after,
+  .more-tools > summary::after {
+    content: "＋";
+    margin-left: auto;
+    color: var(--text-dim);
+    font-size: 18px;
+  }
+  .advanced-controls[open] > summary::after,
+  .more-tools[open] > summary::after { content: "−"; }
+  .advanced-controls-body,
+  .more-tools-body {
+    padding: 4px 14px 14px;
+    border-top: 1px solid #303741;
+  }
+  .advanced-controls-body > .row { margin-top: 14px; }
+
+  .main-copy-card {
+    margin-bottom: 14px;
+    padding: 15px;
+    border: 1px solid #4a756e;
+    border-radius: 14px;
+    background: #17201f;
+  }
+  .main-copy-card h2 {
+    margin: 0 0 10px;
+    color: var(--combo);
+    font-size: 14px;
+  }
+  .main-copy-card .combo-two {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .main-copy-card .copy-btn {
+    width: 100%;
+    background: var(--combo);
+    color: var(--bg);
+    font-size: 14px;
+  }
+  .more-tools {
+    margin: 0 0 16px;
+    background: #1a1f26;
+  }
+  .more-tools > summary { min-height: 54px; font-size: 14px; }
+  .more-tools-body > :first-child { margin-top: 14px; }
+  .more-tools-body .card { margin-left: 0; margin-right: 0; }
 
   .skip-link {
     position: fixed;
@@ -1414,6 +1488,10 @@
       </div>
     </section>
 
+    <section class="main-copy-card" id="main-copy-card" aria-labelledby="main-copy-heading">
+      <h2 id="main-copy-heading">📋 全体結果をコピー</h2>
+    </section>
+
     <div class="snapshot-save-area">
       <p>現在のルーレット・豚・野球・還元人数をまとめて保存します。保存後は履歴からこの状態へ戻せます。</p>
       <button type="button" class="snapshot-save-btn" id="snapshot-save" disabled>💾 現在の集計を記憶する</button>
@@ -1442,10 +1520,10 @@
   </main>
 </div>
 
-<nav class="quick-nav" id="quick-nav" aria-label="計算枠へすぐ移動">
-  <a href="#roulette-card" aria-current="location">🎯 ルレ</a>
-  <a href="#pig-card">🐷 豚</a>
-  <a href="#baseball-card">⚾ 野球</a>
+<nav class="quick-nav" id="quick-nav" aria-label="計算画面を切り替える" role="tablist">
+  <button type="button" id="tab-roulette" data-target="roulette-card" role="tab" aria-controls="roulette-card" aria-selected="true">🎯 ルレ</button>
+  <button type="button" id="tab-pig" data-target="pig-card" role="tab" aria-controls="pig-card" aria-selected="false">🐷 豚</button>
+  <button type="button" id="tab-baseball" data-target="baseball-card" role="tab" aria-controls="baseball-card" aria-selected="false">⚾ 野球</button>
 </nav>
 
 <dialog class="install-dialog" id="install-dialog" aria-labelledby="install-title">
@@ -1488,7 +1566,7 @@
 </dialog>
 
 <script src="./install.js" defer></script>
-<script src="./record-history.js?v=39" defer></script>
-<script src="./app.js?v=39" defer></script>
+<script src="./record-history.js?v=40" defer></script>
+<script src="./app.js?v=40" defer></script>
 </body>
 </html>
