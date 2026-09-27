@@ -127,7 +127,6 @@
   const importSummary = byId('import-summary');
   const importCancelBtn = byId('import-cancel');
   const importApplyBtn = byId('import-apply');
-  const mainCopyCard = byId('main-copy-card');
   const quickNavButtons = Array.from(document.querySelectorAll('.quick-nav [data-target]'));
 
   let rData = null;
@@ -213,17 +212,8 @@
     bError,
   ]);
 
-  [
-    rCopyText.closest('.copy-row'),
-    pCopyText.closest('.copy-row'),
-    pigCard.querySelector('.pig-quick-copy-label'),
-    bCopyText.closest('.copy-row'),
-  ].filter(Boolean).forEach((node) => { node.hidden = true; });
-
   const combinedCopyArea = twoCopyText.closest('.combo-two');
-  combinedCopyArea.querySelector('.combo-two-label').textContent = '入力済みのルーレット・豚・野球をまとめてコピーできます';
-  twoCopyBtn.textContent = '全体結果をコピー';
-  mainCopyCard.appendChild(combinedCopyArea);
+  combinedCopyArea.hidden = true;
 
   const moreTools = document.createElement('details');
   moreTools.className = 'more-tools';

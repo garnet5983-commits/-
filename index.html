@@ -50,8 +50,7 @@
   #roulette-card { order: 10; }
   #pig-card { order: 20; }
   #baseball-card { order: 30; }
-  #main-copy-card { order: 40; }
-  #more-tools { order: 50; }
+  #more-tools { order: 40; }
   #status-message { order: 100; }
   #stepper-toast-stack { order: 101; }
   #roulette-card,
@@ -157,29 +156,6 @@
   }
   .advanced-controls-body > .row { margin-top: 14px; }
 
-  .main-copy-card {
-    margin-bottom: 14px;
-    padding: 15px;
-    border: 1px solid #4a756e;
-    border-radius: 14px;
-    background: #17201f;
-  }
-  .main-copy-card h2 {
-    margin: 0 0 10px;
-    color: var(--combo);
-    font-size: 14px;
-  }
-  .main-copy-card .combo-two {
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-  .main-copy-card .copy-btn {
-    width: 100%;
-    background: var(--combo);
-    color: var(--bg);
-    font-size: 14px;
-  }
   .more-tools {
     margin: 0 0 16px;
     background: #1a1f26;
@@ -1488,10 +1464,6 @@
       </div>
     </section>
 
-    <section class="main-copy-card" id="main-copy-card" aria-labelledby="main-copy-heading">
-      <h2 id="main-copy-heading">📋 全体結果をコピー</h2>
-    </section>
-
     <div class="snapshot-save-area">
       <p>現在のルーレット・豚・野球・還元人数をまとめて保存します。保存後は履歴からこの状態へ戻せます。</p>
       <button type="button" class="snapshot-save-btn" id="snapshot-save" disabled>💾 現在の集計を記憶する</button>
@@ -1566,7 +1538,7 @@
 </dialog>
 
 <script src="./install.js" defer></script>
-<script src="./record-history.js?v=40" defer></script>
-<script src="./app.js?v=40" defer></script>
+<script src="./record-history.js?v=41" defer></script>
+<script src="./app.js?v=41" defer></script>
 </body>
 </html>
