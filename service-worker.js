@@ -1,13 +1,14 @@
 'use strict';
 
 const CACHE_PREFIX = 'success-rate-calc-';
-const CACHE_NAME = `${CACHE_PREFIX}v41`;
+const CACHE_NAME = `${CACHE_PREFIX}v43`;
 const APP_ROOT = new URL('./', self.location.href);
 const INDEX_URL = new URL('./index.html', self.location.href).href;
 const APP_SHELL = [
   INDEX_URL,
   new URL('./app.js', self.location.href).href,
   new URL('./record-history.js', self.location.href).href,
+  new URL('./correction.js', self.location.href).href,
   new URL('./install.js', self.location.href).href,
   new URL('./manifest.json', self.location.href).href,
   new URL('./icon-180.png', self.location.href).href,

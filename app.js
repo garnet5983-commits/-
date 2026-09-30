@@ -128,6 +128,18 @@
   const importCancelBtn = byId('import-cancel');
   const importApplyBtn = byId('import-apply');
   const quickNavButtons = Array.from(document.querySelectorAll('.quick-nav [data-target]'));
+  const correctionDialog = byId('correction-dialog');
+  const correctionGame = byId('correction-game');
+  const correctionFrom = byId('correction-from');
+  const correctionTo = byId('correction-to');
+  const correctionCount = byId('correction-count');
+  const correctionPreview = byId('correction-preview');
+  const correctionError = byId('correction-error');
+  const correctionApply = byId('correction-apply');
+  const correctionUndo = byId('correction-undo');
+  let checkedCorrection = null;
+  let correctionBackup = null;
+  let applyingCorrection = false;
 
   let rData = null;
   let pData = null;
@@ -268,6 +280,159 @@
     });
   });
   showGamePanel('roulette-card');
+
+  function correctionState() {
+    return { snapshot: captureSnapshot(),
+      pig: JSON.parse(JSON.stringify(quickRecords)),
+      roulette: JSON.parse(JSON.stringify(rouletteQuickRecords)),
+      baseball: JSON.parse(JSON.stringify(baseballQuickRecords)) };
+  }
+
+  function correctionChoice() {
+    return { game: correctionGame.value, from: correctionFrom.value,
+      to: correctionTo.value, count: correctionCount.value };
+  }
+
+  function clearCorrectionPreview() {
+    checkedCorrection = null;
+    correctionApply.disabled = true;
+    correctionPreview.hidden = true;
+    correctionError.textContent = '';
+  }
+
+  function populateCorrectionOptions() {
+    const pig = correctionGame.value === 'p';
+    const base = pig ? ['failure', '2000', '2500', '3000', '3500', '4000', '4500'] : ['success', 'failure'];
+    const setOptions = (select, values) => {
+      select.replaceChildren();
+      values.forEach((value) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = TargetCorrection.label(value);
+        select.appendChild(option);
+      });
+    };
+    setOptions(correctionFrom, pig ? [...base, 'unknown'] : base);
+    setOptions(correctionTo, [...base, 'delete']);
+    correctionFrom.value = pig ? '3500' : 'success';
+    correctionTo.value = pig ? '4000' : 'failure';
+    clearCorrectionPreview();
+  }
+
+  function applyCorrectionValues(snapshot, game, records = null) {
+    const inputs = { r: [rTotal, rSuccess], p: [pTotal, pSuccess], b: [bTotal, bSuccess] };
+    inputs[game][0].value = snapshot[`${game}Total`];
+    inputs[game][1].value = snapshot[`${game}Success`];
+    if (game === 'p') {
+      Object.entries(TargetCorrection.refunds).forEach(([amount, key]) => refundCounters[amount].set(snapshot[key]));
+      clearQuickUndo();
+      if (records) quickRecords = records.pig;
+      renderRefundCount();
+      updatePig(true);
+      refreshQuickUndo();
+      if (quickRecords.length) pigQuickStatus.textContent = `${quickRecords.length}件の記録を順番に戻せます`;
+    } else if (game === 'r') {
+      clearRouletteQuickUndo();
+      if (records) rouletteQuickRecords = records.roulette;
+      updateRoulette(true);
+      if (rouletteQuickRecords.length) rouletteQuickStatus.textContent = `${rouletteQuickRecords.length}件の記録を順番に戻せます`;
+    } else {
+      clearBaseballQuickUndo();
+      if (records) baseballQuickRecords = records.baseball;
+      updateBaseball(true);
+      if (baseballQuickRecords.length) baseballQuickStatus.textContent = `${baseballQuickRecords.length}件の記録を順番に戻せます`;
+    }
+  }
+
+  [[rouletteQuick, 'r'], [pigQuick, 'p'], [baseballQuick, 'b']].forEach(([quick, game]) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'correction-launch';
+    button.dataset.game = game;
+    button.textContent = '✏️ 結果を指定して修正';
+    button.addEventListener('click', () => {
+      correctionGame.value = game;
+      correctionCount.value = '1';
+      populateCorrectionOptions();
+      correctionDialog.showModal();
+    });
+    quick.appendChild(button);
+  });
+  correctionGame.addEventListener('change', populateCorrectionOptions);
+  [correctionFrom, correctionTo, correctionCount].forEach((input) => {
+    input.addEventListener('input', clearCorrectionPreview);
+    input.addEventListener('change', clearCorrectionPreview);
+  });
+  byId('correction-close').addEventListener('click', () => correctionDialog.close());
+  correctionDialog.addEventListener('close', clearCorrectionPreview);
+  byId('correction-check').addEventListener('click', () => {
+    clearCorrectionPreview();
+    try {
+      const state = correctionState();
+      const choice = correctionChoice();
+      const plan = TargetCorrection.plan(state.snapshot, choice);
+      const game = plan.game;
+      const beforeTotal = plan.before[`${game}Total`];
+      const afterTotal = plan.after[`${game}Total`] || '0';
+      const beforeSuccess = plan.before[`${game}Success`];
+      const afterSuccess = plan.after[`${game}Success`] || '0';
+      const lines = [plan.description,
+        `試行回数：${beforeTotal} → ${afterTotal}`,
+        `成功回数：${beforeSuccess} → ${afterSuccess}`];
+      if (game === 'p') {
+        Object.entries(TargetCorrection.refunds).forEach(([amount, key]) => {
+          if (plan.before[key] !== plan.after[key]) lines.push(`${amount}還元：${plan.before[key]} → ${plan.after[key]}`);
+        });
+      }
+      correctionPreview.textContent = lines.join('\n');
+      correctionPreview.hidden = false;
+      correctionApply.disabled = false;
+      checkedCorrection = { plan, state, signature: JSON.stringify(state), choice: JSON.stringify(choice) };
+    } catch (error) {
+      correctionError.textContent = error.message;
+    }
+  });
+  correctionApply.addEventListener('click', () => {
+    const checked = checkedCorrection;
+    if (!checked) return;
+    if (JSON.stringify(correctionState()) !== checked.signature || JSON.stringify(correctionChoice()) !== checked.choice) {
+      clearCorrectionPreview();
+      correctionError.textContent = '集計または選択が変わりました。もう一度「修正内容を確認」を押してください。';
+      return;
+    }
+    const plan = checked.plan;
+    applyingCorrection = true;
+    applyCorrectionValues(plan.after, plan.game);
+    saveInputs();
+    applyingCorrection = false;
+    correctionBackup = { before: checked.state, after: JSON.stringify(correctionState()), game: plan.game };
+    correctionUndo.disabled = false;
+    clearCorrectionPreview();
+    correctionPreview.textContent = `修正しました\n${plan.description}`;
+    correctionPreview.hidden = false;
+    const statuses = { r: rouletteQuickStatus, p: pigQuickStatus, b: baseballQuickStatus };
+    statuses[plan.game].textContent = plan.description;
+    announce(`修正しました。${plan.description}`);
+  });
+  correctionUndo.addEventListener('click', () => {
+    const backup = correctionBackup;
+    if (!backup || JSON.stringify(correctionState()) !== backup.after) {
+      correctionBackup = null;
+      correctionUndo.disabled = true;
+      correctionError.textContent = '修正後に集計が変わったため、元に戻せません。結果を指定して修正してください。';
+      return;
+    }
+    applyingCorrection = true;
+    applyCorrectionValues(backup.before.snapshot, backup.game, backup.before);
+    saveInputs();
+    applyingCorrection = false;
+    correctionBackup = null;
+    correctionUndo.disabled = true;
+    clearCorrectionPreview();
+    correctionPreview.textContent = '修正前の集計とワンタップ履歴へ戻しました。';
+    correctionPreview.hidden = false;
+    announce('修正前の状態へ戻しました。');
+  });
 
   function announce(message) {
     window.clearTimeout(statusTimer);
@@ -1158,6 +1323,13 @@
 
   function saveInputs() {
     if (!applyingSnapshot) clearRestoreOffer();
+    if (!applyingCorrection && correctionBackup && JSON.stringify(correctionState()) !== correctionBackup.after) {
+      correctionBackup = null;
+      correctionUndo.disabled = true;
+    }
+    if (!applyingCorrection && checkedCorrection && JSON.stringify(correctionState()) !== checkedCorrection.signature) {
+      clearCorrectionPreview();
+    }
     writeStoredJSON(INPUTS_KEY, {
       rSuccess: rSuccess.value,
       rTotal: rTotal.value,
